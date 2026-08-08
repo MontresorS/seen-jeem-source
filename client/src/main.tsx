@@ -1,9 +1,6 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
-
-if (!window.location.hash) {
-  window.location.hash = "#/";
-}
+import "./moving-letters.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
