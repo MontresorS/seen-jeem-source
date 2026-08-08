@@ -96,6 +96,7 @@ export default function QuestionView() {
   const isWadda7 = catKey === "wadda7";
   const isZoom = catKey === "zoom";
   const isLogos = catKey === "logos";
+      const isFlags = catKey === "flags";
   const isFirstLetter = catKey === "firstletter";
   const isMoving = catKey === "moving";
   const isOrdering = catKey === "ordering";
@@ -273,6 +274,14 @@ export default function QuestionView() {
               </div>
             </div>
           )}
+          
+{isFlags && (
+  <div className="mt-4 flex justify-center">
+    <span className="text-[9rem] leading-none sm:text-[12rem] 2xl:text-[16rem]">
+      {({ "مصر": "🇪🇬", "السعودية": "🇸🇦", "الإمارات": "🇦🇪", "الكويت": "🇰🇼", "قطر": "🇶🇦", "البحرين": "🇧🇭", "عمان": "🇴🇲", "الأردن": "🇯🇴", "فلسطين": "🇵🇸", "لبنان": "🇱🇧", "سوريا": "🇸🇾", "العراق": "🇮🇶", "المغرب": "🇲🇦", "الجزائر": "🇩🇿", "تونس": "🇹🇳", "تركيا": "🇹🇷", "أمريكا": "🇺🇸", "بريطانيا": "🇬🇧", "فرنسا": "🇫🇷", "ألمانيا": "🇩🇪", "إيطاليا": "🇮🇹", "إسبانيا": "🇪🇸", "اليابان": "🇯🇵", "الصين": "🇨🇳", "الهند": "🇮🇳", "البرازيل": "🇧🇷", "كندا": "🇨🇦", "أستراليا": "🇦🇺" } as Record<string, string>)[activeCell.question.a.trim()] || "🏳️"}
+    </span>
+  </div>
+)}
 
           {isFirstLetter && (
             <div className="mt-4 flex items-center justify-center gap-2" data-testid="block-first-letter">
@@ -377,9 +386,7 @@ export default function QuestionView() {
           {isLogos && (
             <div className="mt-4 flex justify-center" data-testid="block-logo-mask">
               <div className="relative overflow-hidden rounded-2xl border-4 border-card-border bg-white p-4 shadow-inner dark:bg-card">
-                <span className="text-7xl font-black sm:text-9xl 2xl:text-[12rem]">
-                  {activeCell.question.q}
-                </span>
+                <img src={activeCell.question.image} alt="logo" className="h-44 w-72 object-contain sm:h-56 sm:w-96 2xl:h-80 2xl:w-[34rem]" />
                 {!revealed &&
                   logoMask.map((m, i) => (
                     <div
