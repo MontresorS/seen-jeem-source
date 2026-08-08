@@ -22,6 +22,8 @@ import {
 import { HelpDialog, LifelineChip, Logo } from "./ui";
 import { cn } from "@/lib/utils";
 
+const CATEGORY_TEXT_COLOR = "#3E2723"; // dark brown
+
 function TeamPanel({ index }: { index: TeamIndex }) {
   const { state, dispatch } = useGame();
   const team = state.teams[index];
@@ -84,7 +86,6 @@ function TeamPanel({ index }: { index: TeamIndex }) {
           </Button>
         </div>
       </div>
-
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {LIFELINES.map((l) => (
           <LifelineChip
@@ -111,7 +112,6 @@ export default function Board() {
   const holeArmedBy = state.pendingHole;
   const turnTeam = state.teams[state.turn];
   const charadesLeft = CHARADES_MAX_USES - turnTeam.charadesUsed;
-
   return (
     <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 lg:h-[100dvh] lg:overflow-hidden lg:pb-3 2xl:gap-3 2xl:px-6">
       {/* top bar — always visible */}
@@ -131,7 +131,7 @@ export default function Board() {
               data-testid="text-recycled-note"
               className="flex items-center gap-1 rounded-full border-2 border-amber-500 bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100 2xl:text-base"
             >
-              <Recycle className="h-3.5 w-3.5" /> بعض الأسئلة معادة (♻) — خلص بنك الفئة
+              <Recycle className="h-3.5 w-3.5" /> بعض الأسئلة معادة (♲) — خلص بنك الفئة
             </span>
           )}
           <span
@@ -171,7 +171,6 @@ export default function Board() {
           </AlertDialog>
         </div>
       </header>
-
       {/* scores + turn banner + بدون كلام */}
       <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-stretch">
         <TeamPanel index={0} />
@@ -211,7 +210,6 @@ export default function Board() {
         </div>
         <TeamPanel index={1} />
       </div>
-
       {/* board — 6 columns across, fits the TV without scrolling */}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6 2xl:gap-4">
         {state.catKeys.map((key) => {
@@ -227,7 +225,12 @@ export default function Board() {
                 <span aria-hidden className="text-2xl leading-none 2xl:text-4xl">
                   {cat.emoji}
                 </span>
-                <h3 className="text-sm font-extrabold leading-tight 2xl:text-2xl">{cat.name}</h3>
+                <h3
+                  className="text-sm font-extrabold leading-tight 2xl:text-2xl"
+                  style={{ color: CATEGORY_TEXT_COLOR }}
+                >
+                  {cat.name}
+                </h3>
               </div>
               <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-3 gap-2 p-2 2xl:gap-3 2xl:p-3">
                 {cells.map((cell) => (
@@ -254,7 +257,7 @@ export default function Board() {
                         title="سؤال معاد من جلسة سابقة"
                         className="absolute left-1 top-1 text-[10px] font-black opacity-70 2xl:text-base"
                       >
-                        ♻
+                        ♲
                       </span>
                     )}
                   </button>
