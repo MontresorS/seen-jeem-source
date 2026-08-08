@@ -276,9 +276,19 @@ export default function QuestionView() {
           )}
           
 {isFlags && (
+{isFlags && (
   <div className="mt-4 flex justify-center">
     <span className="text-[9rem] leading-none sm:text-[12rem] 2xl:text-[16rem]">
-      {({ "مصر": "🇪🇬", "السعودية": "🇸🇦", "الإمارات": "🇦🇪", "الكويت": "🇰🇼", "قطر": "🇶🇦", "البحرين": "🇧🇭", "عمان": "🇴🇲", "الأردن": "🇯🇴", "فلسطين": "🇵🇸", "لبنان": "🇱🇧", "سوريا": "🇸🇾", "العراق": "🇮🇶", "المغرب": "🇲🇦", "الجزائر": "🇩🇿", "تونس": "🇹🇳", "تركيا": "🇹🇷", "أمريكا": "🇺🇸", "بريطانيا": "🇬🇧", "فرنسا": "🇫🇷", "ألمانيا": "🇩🇪", "إيطاليا": "🇮🇹", "إسبانيا": "🇪🇸", "اليابان": "🇯🇵", "الصين": "🇨🇳", "الهند": "🇮🇳", "البرازيل": "🇧🇷", "كندا": "🇨🇦", "أستراليا": "🇦🇺" } as Record<string, string>)[activeCell.question.a.trim()] || "🏳️"}
+      {(() => {
+        const src = activeCell.question.image || "";
+        const match = src.match(/\/([a-zA-Z]{2})\.png/);
+        const iso = match ? match[1].toUpperCase() : "";
+        if (iso.length === 2) {
+          const codePoints = [...iso].map((c) => 127397 + c.charCodeAt(0));
+          return String.fromCodePoint(...codePoints);
+        }
+        return "🏳️";
+      })()}
     </span>
   </div>
 )}
