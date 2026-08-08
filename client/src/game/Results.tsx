@@ -78,8 +78,8 @@ export default function Results() {
                   : "border-card-border bg-muted/50",
               )}
             >
-              <p className="truncate text-sm font-extrabold text-secondary dark:text-foreground">
-                {t.name}
+                        <p className="truncate text-sm font-extrabold" style={{ color: "#3E2723" }}>
+            {t.name}
               </p>
               <p className="sj-tick mt-1 text-3xl font-black text-primary">{t.score}</p>
               <p className="mt-1 text-[11px] font-semibold text-muted-foreground">نقطة</p>
