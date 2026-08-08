@@ -11,6 +11,7 @@ const SECOND = 10;
 const CALL = 30;
 const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فقط
 const WADDA7_STEPS = [600, 400, 200] as const;
+const QUESTION_TEXT_COLOR = "#3E2723"; // dark brown
 
 /** hash ثابت من نص — لتوليد عشوائية ثابتة لكل سؤال */
 function hashStr(s: string): number {
@@ -86,6 +87,7 @@ export default function QuestionView() {
   }, [running, revealed, call]);
 
   if (!active || !activeCell) return null;
+
   const cat = CATEGORY_BY_KEY[activeCell.catKey];
   const asking = state.teams[active.askingTeam];
   const otherIdx = active.askingTeam === 0 ? 1 : 0;
@@ -96,7 +98,7 @@ export default function QuestionView() {
   const isWadda7 = catKey === "wadda7";
   const isZoom = catKey === "zoom";
   const isLogos = catKey === "logos";
-      const isFlags = catKey === "flags";
+  const isFlags = catKey === "flags";
   const isFirstLetter = catKey === "firstletter";
   const isMoving = catKey === "moving";
   const isOrdering = catKey === "ordering";
@@ -104,12 +106,10 @@ export default function QuestionView() {
   const isCities = catKey === "cities";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
-
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
   const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
   const resolve = (outcome: Outcome) =>
     dispatch({ type: "RESOLVE", outcome, pointsOverride: isWadda7 ? effectivePoints : undefined });
-
   // زوم: مقدار التقريب حسب النقاط + نقطة ارتكاز ثابتة لكل سؤال
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
   const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
@@ -167,7 +167,6 @@ export default function QuestionView() {
           الدور على: {asking.name}
         </span>
       </div>
-
       <div className="sj-pop overflow-hidden rounded-3xl border-2 border-card-border bg-card sj-shadow-lg">
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
           <span className="flex items-center gap-2 text-sm font-extrabold sm:text-base 2xl:text-3xl">
@@ -183,13 +182,13 @@ export default function QuestionView() {
             {effectivePoints}
           </span>
         </div>
-
         <div className="px-4 py-6 sm:px-8 sm:py-8 2xl:px-14 2xl:py-10">
           {isReversed ? (
             <div className="flex flex-col items-center gap-3" data-testid="block-reversed-audio">
               <p
                 dir="rtl"
-                className="break-words text-center text-2xl font-extrabold leading-relaxed text-secondary dark:text-foreground sm:text-3xl 2xl:text-5xl"
+                className="break-words text-center text-2xl font-extrabold leading-relaxed sm:text-3xl 2xl:text-5xl"
+                style={{ color: QUESTION_TEXT_COLOR }}
               >
                 🎧 اسمعوا كويس… وخمّنوا الكلمة!
               </p>
@@ -215,7 +214,7 @@ export default function QuestionView() {
             </div>
           ) : isSounds ? (
             <div className="flex flex-col items-center gap-4" data-testid="block-sounds">
-              <p dir="rtl" className="break-words text-center text-2xl font-extrabold text-secondary dark:text-foreground sm:text-3xl 2xl:text-5xl">
+              <p dir="rtl" className="break-words text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl" style={{ color: QUESTION_TEXT_COLOR }}>
                 🔊 استمع إلى الصوت وخمّن ماهيته!
               </p>
               <Button
@@ -234,7 +233,8 @@ export default function QuestionView() {
               <p
                 data-testid="text-question"
                 dir="rtl"
-                className="break-words text-center text-xl font-extrabold leading-relaxed text-secondary dark:text-foreground sm:text-2xl 2xl:text-4xl"
+                className="break-words text-center text-xl font-extrabold leading-relaxed sm:text-2xl 2xl:text-4xl"
+                style={{ color: QUESTION_TEXT_COLOR }}
               >
                 {activeCell.question.q}
               </p>
@@ -244,14 +244,14 @@ export default function QuestionView() {
               data-testid="text-question"
               dir="rtl"
               className={cn(
-                "break-words text-center font-extrabold leading-relaxed text-secondary dark:text-foreground",
+                "break-words text-center font-extrabold leading-relaxed",
                 hasImage ? "text-xl sm:text-2xl 2xl:text-4xl" : "text-2xl sm:text-3xl 2xl:text-6xl",
               )}
+              style={{ color: QUESTION_TEXT_COLOR }}
             >
               {activeCell.question.q}
             </p>
           )}
-
           {isOrdering && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-ordering">
               <div className="w-full max-w-xl rounded-2xl border-2 border-card-border bg-muted/30 p-4 text-center">
@@ -274,24 +274,16 @@ export default function QuestionView() {
               </div>
             </div>
           )}
-          
-{isFlags && (
-  <div className="mt-4 flex justify-center">
-    <span className="text-[9rem] leading-none sm:text-[12rem] 2xl:text-[16rem]">
-      {(() => {
-        const src = activeCell.question.image || "";
-        const match = src.match(/\/([a-zA-Z]{2})\.png/);
-        const iso = match ? match[1].toUpperCase() : "";
-        if (iso.length === 2) {
-          const codePoints = [...iso].map((c) => 127397 + c.charCodeAt(0));
-          return String.fromCodePoint(...codePoints);
-        }
-        return "🏳️";
-      })()}
-    </span>
-  </div>
-)}
 
+          {isFlags && (
+            <div className="mt-4 flex justify-center" data-testid="block-flag-image">
+              <img
+                src={activeCell.question.image}
+                alt="علم الدولة"
+                className="h-40 w-auto max-w-full rounded-xl border-4 border-card-border object-contain shadow-md sm:h-56 2xl:h-72"
+              />
+            </div>
+          )}
           {isFirstLetter && (
             <div className="mt-4 flex items-center justify-center gap-2" data-testid="block-first-letter">
               <span className="text-sm font-bold text-muted-foreground 2xl:text-2xl">أول حرف من الإجابة:</span>
@@ -300,7 +292,6 @@ export default function QuestionView() {
               </span>
             </div>
           )}
-
           {isMoving && (
             <div
               className="relative mx-auto mt-4 h-48 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-dashed border-card-border bg-muted/50 p-4 2xl:h-72"
@@ -312,29 +303,28 @@ export default function QuestionView() {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
                 const maxRows = Math.ceil(totalLetters / cols);
-                
+
                 const colWidth = 82 / Math.max(cols, 1);
                 const rowHeight = 72 / Math.max(maxRows, 1);
-                
+
                 const baseLeft = 6 + col * colWidth;
                 const baseTop = 8 + row * rowHeight;
-                
+
                 const h = hashStr(`${activeCell.question.id}-${i}`);
                 const jitterLeft = (h % 10) - 5;
                 const jitterTop = ((h >> 3) % 8) - 4;
-                
+
                 const left = Math.max(4, Math.min(84, baseLeft + jitterLeft));
                 const top = Math.max(4, Math.min(78, baseTop + jitterTop));
-                
+
                 const animClass = `sj-drift-${(i % 4) + 1}`;
                 const dur = 2.8 + ((h >> 4) % 20) / 10;
                 const delay = -((h >> 2) % 25) / 10;
-
                 return (
                   <span
                     key={i}
                     className={cn(
-                      "absolute text-4xl font-black text-secondary dark:text-foreground sm:text-5xl 2xl:text-7xl",
+                      "absolute text-4xl font-black sm:text-5xl 2xl:text-7xl",
                       animClass
                     )}
                     style={{
@@ -342,6 +332,7 @@ export default function QuestionView() {
                       top: `${top}%`,
                       animationDuration: `${dur}s`,
                       animationDelay: `${delay}s`,
+                      color: QUESTION_TEXT_COLOR,
                     }}
                   >
                     {ch}
@@ -350,7 +341,6 @@ export default function QuestionView() {
               })}
             </div>
           )}
-
           {hasImage && (isWadda7 || isZoom) && (
             <div className="mt-4 flex flex-col items-center gap-3">
               <div className="overflow-hidden rounded-2xl border-4 border-card-border bg-muted sj-shadow">
@@ -368,7 +358,6 @@ export default function QuestionView() {
                   }
                 />
               </div>
-
               {isWadda7 && (
                 <div className="flex flex-col items-center gap-1.5" data-testid="block-wadda7-controls">
                   <Button
@@ -391,7 +380,6 @@ export default function QuestionView() {
               )}
             </div>
           )}
-
           {isLogos && (
             <div className="mt-4 flex justify-center" data-testid="block-logo-mask">
               <div className="relative overflow-hidden rounded-2xl border-4 border-card-border bg-white p-4 shadow-inner dark:bg-card">
@@ -407,10 +395,8 @@ export default function QuestionView() {
               </div>
             </div>
           )}
-
           <div className="mt-6 flex flex-col items-center gap-4 sm:mt-8">
             <CircleTimer seconds={shown} total={total} label={label} paused={!running || revealed} />
-
             {!revealed ? (
               <Button
                 data-testid="button-reveal"
@@ -437,7 +423,6 @@ export default function QuestionView() {
               </div>
             )}
           </div>
-
           <div className="mt-6 border-t-2 border-card-border pt-4">
             <p className="mb-2 text-center text-xs font-bold text-muted-foreground 2xl:text-lg">
               وسائل المساعدة المستخدمة للسؤال:
@@ -451,7 +436,6 @@ export default function QuestionView() {
                 ))
               )}
             </div>
-
             {!revealed && (
               <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <Button
@@ -468,7 +452,6 @@ export default function QuestionView() {
               </div>
             )}
           </div>
-
           {revealed && (
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
               <Button
