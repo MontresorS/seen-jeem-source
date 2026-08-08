@@ -1,11 +1,13 @@
-/* Responsive, independent movement for حروف متحركة. Faster speed + full-corner coverage. */
+/* Responsive, independent movement for حروف متحركة. 50% slower + fully contained within the box. */
 #root [data-testid="block-moving-letters"] {
   min-height: clamp(16rem, 52vw, 30rem) !important;
   height: clamp(16rem, 52vw, 30rem) !important;
   isolation: isolate;
   touch-action: manipulation;
   position: relative;
-  overflow: visible;
+  overflow: hidden !important;
+  container-type: size;
+  container-name: sj-moving-box;
 }
 
 #root [data-testid="block-moving-letters"] > span {
@@ -25,54 +27,56 @@
   animation-direction: alternate !important;
 }
 
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 1) { animation-name: sj-letter-float-a !important; animation-duration: 1.8s !important; animation-delay: -1.7s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 2) { animation-name: sj-letter-float-b !important; animation-duration: 2.1s !important; animation-delay: -3.4s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 3) { animation-name: sj-letter-float-c !important; animation-duration: 1.9s !important; animation-delay: -0.9s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 4) { animation-name: sj-letter-float-d !important; animation-duration: 2.3s !important; animation-delay: -4.1s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 5) { animation-name: sj-letter-float-e !important; animation-duration: 2.0s !important; animation-delay: -2.6s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n) { animation-name: sj-letter-float-f !important; animation-duration: 2.2s !important; animation-delay: -5s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 1) { animation-name: sj-letter-float-a !important; animation-duration: 2.7s !important; animation-delay: -1.7s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 2) { animation-name: sj-letter-float-b !important; animation-duration: 3.15s !important; animation-delay: -3.4s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 3) { animation-name: sj-letter-float-c !important; animation-duration: 2.85s !important; animation-delay: -0.9s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 4) { animation-name: sj-letter-float-d !important; animation-duration: 3.45s !important; animation-delay: -4.1s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 5) { animation-name: sj-letter-float-e !important; animation-duration: 3.0s !important; animation-delay: -2.6s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n) { animation-name: sj-letter-float-f !important; animation-duration: 3.3s !important; animation-delay: -5s !important; }
 
+/* Amplitudes use container query units (cqw/cqh) so letters travel relative to
+   the box itself and never escape it, with margin left for the letter's own size. */
 @keyframes sj-letter-float-a {
-  0%   { transform: translate3d(-48vw, -48vh, 0) rotate(-9deg); }
-  25%  { transform: translate3d(46vw, -46vh, 0) rotate(9deg); }
-  50%  { transform: translate3d(48vw, 46vh, 0) rotate(-8deg); }
-  75%  { transform: translate3d(-46vw, 44vh, 0) rotate(8deg); }
-  100% { transform: translate3d(-48vw, -48vh, 0) rotate(-9deg); }
+  0%   { transform: translate3d(-32cqw, -32cqh, 0) rotate(-9deg); }
+  25%  { transform: translate3d(30cqw, -30cqh, 0) rotate(9deg); }
+  50%  { transform: translate3d(32cqw, 30cqh, 0) rotate(-8deg); }
+  75%  { transform: translate3d(-30cqw, 28cqh, 0) rotate(8deg); }
+  100% { transform: translate3d(-32cqw, -32cqh, 0) rotate(-9deg); }
 }
 @keyframes sj-letter-float-b {
-  0%   { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
-  25%  { transform: translate3d(-48vw, 44vh, 0) rotate(-8deg); }
-  50%  { transform: translate3d(-46vw, -48vh, 0) rotate(6deg); }
-  75%  { transform: translate3d(48vw, 46vh, 0) rotate(-7deg); }
-  100% { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
+  0%   { transform: translate3d(30cqw, -30cqh, 0) rotate(7deg); }
+  25%  { transform: translate3d(-32cqw, 28cqh, 0) rotate(-8deg); }
+  50%  { transform: translate3d(-30cqw, -32cqh, 0) rotate(6deg); }
+  75%  { transform: translate3d(32cqw, 30cqh, 0) rotate(-7deg); }
+  100% { transform: translate3d(30cqw, -30cqh, 0) rotate(7deg); }
 }
 @keyframes sj-letter-float-c {
-  0%   { transform: translate3d(-48vw, 44vh, 0) rotate(5deg); }
-  25%  { transform: translate3d(46vw, 46vh, 0) rotate(-7deg); }
-  50%  { transform: translate3d(48vw, -44vh, 0) rotate(8deg); }
-  75%  { transform: translate3d(-46vw, -48vh, 0) rotate(-6deg); }
-  100% { transform: translate3d(-48vw, 44vh, 0) rotate(5deg); }
+  0%   { transform: translate3d(-32cqw, 28cqh, 0) rotate(5deg); }
+  25%  { transform: translate3d(30cqw, 30cqh, 0) rotate(-7deg); }
+  50%  { transform: translate3d(32cqw, -28cqh, 0) rotate(8deg); }
+  75%  { transform: translate3d(-30cqw, -32cqh, 0) rotate(-6deg); }
+  100% { transform: translate3d(-32cqw, 28cqh, 0) rotate(5deg); }
 }
 @keyframes sj-letter-float-d {
-  0%   { transform: translate3d(44vw, 46vh, 0) rotate(-6deg); }
-  25%  { transform: translate3d(-46vw, -48vh, 0) rotate(9deg); }
-  50%  { transform: translate3d(-48vw, 44vh, 0) rotate(-8deg); }
-  75%  { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
-  100% { transform: translate3d(44vw, 46vh, 0) rotate(-6deg); }
+  0%   { transform: translate3d(28cqw, 30cqh, 0) rotate(-6deg); }
+  25%  { transform: translate3d(-30cqw, -32cqh, 0) rotate(9deg); }
+  50%  { transform: translate3d(-32cqw, 28cqh, 0) rotate(-8deg); }
+  75%  { transform: translate3d(30cqw, -30cqh, 0) rotate(7deg); }
+  100% { transform: translate3d(28cqw, 30cqh, 0) rotate(-6deg); }
 }
 @keyframes sj-letter-float-e {
-  0%   { transform: translate3d(-46vw, 48vh, 0) rotate(9deg); }
-  25%  { transform: translate3d(48vw, -44vh, 0) rotate(-5deg); }
-  50%  { transform: translate3d(46vw, 46vh, 0) rotate(6deg); }
-  75%  { transform: translate3d(-48vw, -46vh, 0) rotate(-9deg); }
-  100% { transform: translate3d(-46vw, 48vh, 0) rotate(9deg); }
+  0%   { transform: translate3d(-30cqw, 32cqh, 0) rotate(9deg); }
+  25%  { transform: translate3d(32cqw, -28cqh, 0) rotate(-5deg); }
+  50%  { transform: translate3d(30cqw, 30cqh, 0) rotate(6deg); }
+  75%  { transform: translate3d(-32cqw, -30cqh, 0) rotate(-9deg); }
+  100% { transform: translate3d(-30cqw, 32cqh, 0) rotate(9deg); }
 }
 @keyframes sj-letter-float-f {
-  0%   { transform: translate3d(48vw, 44vh, 0) rotate(-8deg); }
-  25%  { transform: translate3d(-46vw, -46vh, 0) rotate(6deg); }
-  50%  { transform: translate3d(-48vw, 48vh, 0) rotate(-7deg); }
-  75%  { transform: translate3d(46vw, -44vh, 0) rotate(8deg); }
-  100% { transform: translate3d(48vw, 44vh, 0) rotate(-8deg); }
+  0%   { transform: translate3d(32cqw, 28cqh, 0) rotate(-8deg); }
+  25%  { transform: translate3d(-30cqw, -30cqh, 0) rotate(6deg); }
+  50%  { transform: translate3d(-32cqw, 32cqh, 0) rotate(-7deg); }
+  75%  { transform: translate3d(30cqw, -28cqh, 0) rotate(8deg); }
+  100% { transform: translate3d(32cqw, 28cqh, 0) rotate(-8deg); }
 }
 
 @media (max-width: 480px) {
