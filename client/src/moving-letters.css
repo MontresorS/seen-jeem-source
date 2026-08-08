@@ -1,9 +1,11 @@
-/* Responsive, independent movement for حروف متحركة. */
+/* Responsive, independent movement for حروف متحركة. Faster speed + full-corner coverage. */
 #root [data-testid="block-moving-letters"] {
   min-height: clamp(16rem, 52vw, 30rem) !important;
   height: clamp(16rem, 52vw, 30rem) !important;
   isolation: isolate;
   touch-action: manipulation;
+  position: relative;
+  overflow: visible;
 }
 
 #root [data-testid="block-moving-letters"] > span {
@@ -23,19 +25,55 @@
   animation-direction: alternate !important;
 }
 
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 1) { animation-name: sj-letter-float-a !important; animation-duration: 5.8s !important; animation-delay: -1.7s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 2) { animation-name: sj-letter-float-b !important; animation-duration: 7.1s !important; animation-delay: -3.4s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 3) { animation-name: sj-letter-float-c !important; animation-duration: 6.4s !important; animation-delay: -0.9s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 4) { animation-name: sj-letter-float-d !important; animation-duration: 7.8s !important; animation-delay: -4.1s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n + 5) { animation-name: sj-letter-float-e !important; animation-duration: 6.7s !important; animation-delay: -2.6s !important; }
-#root [data-testid="block-moving-letters"] > span:nth-child(6n) { animation-name: sj-letter-float-f !important; animation-duration: 7.4s !important; animation-delay: -5s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 1) { animation-name: sj-letter-float-a !important; animation-duration: 1.8s !important; animation-delay: -1.7s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 2) { animation-name: sj-letter-float-b !important; animation-duration: 2.1s !important; animation-delay: -3.4s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 3) { animation-name: sj-letter-float-c !important; animation-duration: 1.9s !important; animation-delay: -0.9s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 4) { animation-name: sj-letter-float-d !important; animation-duration: 2.3s !important; animation-delay: -4.1s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n + 5) { animation-name: sj-letter-float-e !important; animation-duration: 2.0s !important; animation-delay: -2.6s !important; }
+#root [data-testid="block-moving-letters"] > span:nth-child(6n) { animation-name: sj-letter-float-f !important; animation-duration: 2.2s !important; animation-delay: -5s !important; }
 
-@keyframes sj-letter-float-a { from { transform: translate3d(-24px, -18px, 0) rotate(-9deg); } to { transform: translate3d(30px, 24px, 0) rotate(8deg); } }
-@keyframes sj-letter-float-b { from { transform: translate3d(26px, -26px, 0) rotate(7deg); } to { transform: translate3d(-28px, 18px, 0) rotate(-8deg); } }
-@keyframes sj-letter-float-c { from { transform: translate3d(-32px, 14px, 0) rotate(5deg); } to { transform: translate3d(22px, -28px, 0) rotate(-7deg); } }
-@keyframes sj-letter-float-d { from { transform: translate3d(18px, 28px, 0) rotate(-6deg); } to { transform: translate3d(-26px, -24px, 0) rotate(9deg); } }
-@keyframes sj-letter-float-e { from { transform: translate3d(-18px, 30px, 0) rotate(9deg); } to { transform: translate3d(32px, -16px, 0) rotate(-5deg); } }
-@keyframes sj-letter-float-f { from { transform: translate3d(30px, 10px, 0) rotate(-8deg); } to { transform: translate3d(-22px, -30px, 0) rotate(6deg); } }
+@keyframes sj-letter-float-a {
+  0%   { transform: translate3d(-48vw, -48vh, 0) rotate(-9deg); }
+  25%  { transform: translate3d(46vw, -46vh, 0) rotate(9deg); }
+  50%  { transform: translate3d(48vw, 46vh, 0) rotate(-8deg); }
+  75%  { transform: translate3d(-46vw, 44vh, 0) rotate(8deg); }
+  100% { transform: translate3d(-48vw, -48vh, 0) rotate(-9deg); }
+}
+@keyframes sj-letter-float-b {
+  0%   { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
+  25%  { transform: translate3d(-48vw, 44vh, 0) rotate(-8deg); }
+  50%  { transform: translate3d(-46vw, -48vh, 0) rotate(6deg); }
+  75%  { transform: translate3d(48vw, 46vh, 0) rotate(-7deg); }
+  100% { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
+}
+@keyframes sj-letter-float-c {
+  0%   { transform: translate3d(-48vw, 44vh, 0) rotate(5deg); }
+  25%  { transform: translate3d(46vw, 46vh, 0) rotate(-7deg); }
+  50%  { transform: translate3d(48vw, -44vh, 0) rotate(8deg); }
+  75%  { transform: translate3d(-46vw, -48vh, 0) rotate(-6deg); }
+  100% { transform: translate3d(-48vw, 44vh, 0) rotate(5deg); }
+}
+@keyframes sj-letter-float-d {
+  0%   { transform: translate3d(44vw, 46vh, 0) rotate(-6deg); }
+  25%  { transform: translate3d(-46vw, -48vh, 0) rotate(9deg); }
+  50%  { transform: translate3d(-48vw, 44vh, 0) rotate(-8deg); }
+  75%  { transform: translate3d(46vw, -46vh, 0) rotate(7deg); }
+  100% { transform: translate3d(44vw, 46vh, 0) rotate(-6deg); }
+}
+@keyframes sj-letter-float-e {
+  0%   { transform: translate3d(-46vw, 48vh, 0) rotate(9deg); }
+  25%  { transform: translate3d(48vw, -44vh, 0) rotate(-5deg); }
+  50%  { transform: translate3d(46vw, 46vh, 0) rotate(6deg); }
+  75%  { transform: translate3d(-48vw, -46vh, 0) rotate(-9deg); }
+  100% { transform: translate3d(-46vw, 48vh, 0) rotate(9deg); }
+}
+@keyframes sj-letter-float-f {
+  0%   { transform: translate3d(48vw, 44vh, 0) rotate(-8deg); }
+  25%  { transform: translate3d(-46vw, -46vh, 0) rotate(6deg); }
+  50%  { transform: translate3d(-48vw, 48vh, 0) rotate(-7deg); }
+  75%  { transform: translate3d(46vw, -44vh, 0) rotate(8deg); }
+  100% { transform: translate3d(48vw, 44vh, 0) rotate(-8deg); }
+}
 
 @media (max-width: 480px) {
   #root [data-testid="block-moving-letters"] { min-height: 17rem !important; height: 17rem !important; }
