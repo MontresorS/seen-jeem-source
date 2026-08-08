@@ -1,8 +1,5 @@
 {
-  "name": "seen-jeem",
+  "name": "seen-jeem-source",
   "compatibility_date": "2026-08-08",
-  "assets": {
-    "directory": "./dist/public",
-    "not_found_handling": "single-page-application"
-  }
+  "pages_build_output_dir": "./dist/public"
 }
