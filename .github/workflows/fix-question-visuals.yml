@@ -1,0 +1,52 @@
+name: Fix question visuals
+on:
+  push:
+    paths:
+      - .github/workflows/fix-question-visuals.yml
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('client/src/game/Question.tsx')
+          s = p.read_text()
+          s = s.replace('  const isLogos = catKey === "logos";\n', '  const isLogos = catKey === "logos";\n  const isFlags = catKey === "flags";\n')
+          marker = 'const LOGO_MASKS: { left: number; top: number; w: number; h: number }[][] = ['
+          flags = '''const FLAG_EMOJIS: Record<string, string> = { "مصر":"🇪🇬", "السعودية":"🇸🇦", "الإمارات":"🇦🇪", "الامارات":"🇦🇪", "الكويت":"🇰🇼", "قطر":"🇶🇦", "البحرين":"🇧🇭", "عمان":"🇴🇲", "الأردن":"🇯🇴", "الاردن":"🇯🇴", "فلسطين":"🇵🇸", "لبنان":"🇱🇧", "سوريا":"🇸🇾", "العراق":"🇮🇶", "المغرب":"🇲🇦", "الجزائر":"🇩🇿", "تونس":"🇹🇳", "ليبيا":"🇱🇾", "السودان":"🇸🇩", "اليمن":"🇾🇪", "تركيا":"🇹🇷", "أمريكا":"🇺🇸", "الولايات المتحدة":"🇺🇸", "بريطانيا":"🇬🇧", "فرنسا":"🇫🇷", "ألمانيا":"🇩🇪", "المانيا":"🇩🇪", "إيطاليا":"🇮🇹", "ايطاليا":"🇮🇹", "إسبانيا":"🇪🇸", "اسبانيا":"🇪🇸", "اليابان":"🇯🇵", "الصين":"🇨🇳", "الهند":"🇮🇳", "البرازيل":"🇧🇷", "كندا":"🇨🇦", "أستراليا":"🇦🇺", "استراليا":"🇦🇺"};\n\n'''
+          s = s.replace(marker, flags + marker)
+          old = '''<span className="text-7xl font-black sm:text-9xl 2xl:text-[12rem]">
+                  {activeCell.question.q}
+                </span>'''
+          new = '''<img src={activeCell.question.image} alt="شعار السؤال" className="h-44 w-72 object-contain sm:h-56 sm:w-96 2xl:h-80 2xl:w-[34rem]" />'''
+          s = s.replace(old, new)
+          before = '          {isLogos && (\n'
+          block = '''          {isFlags && (
+            <div className="mt-4 flex justify-center" data-testid="block-flag-emoji">
+              <span className="text-[9rem] leading-none sm:text-[12rem] 2xl:text-[16rem]">{FLAG_EMOJIS[activeCell.question.a.trim()] || "🏳️"}</span>
+            </div>
+          )}
+
+'''
+          s = s.replace(before, block + before)
+          style = '''
+  useEffect(() => {
+    const el = document.createElement("style");
+    el.textContent = `html,body,#root{background:#06121f!important;color:#f8fafc!important}[class*="text-muted"]{color:#dbeafe!important}button,[role="button"]{border-color:#7dd3fc!important}`;
+    document.head.appendChild(el);
+    return () => el.remove();
+  }, []);
+'''
+          s = s.replace('  if (!active || !activeCell) return null;\n', style + '\n  if (!active || !activeCell) return null;\n')
+          p.write_text(s)
+          PY
+      - run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add client/src/game/Question.tsx
+          git diff --cached --quiet || git commit -m 'Fix logo and flag rendering and contrast'
+          git push
