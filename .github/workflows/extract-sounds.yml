@@ -1,0 +1,36 @@
+name: Extract sound assets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - sounds.zip
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract audio files
+        run: |
+          rm -rf client/public/audio/sounds
+          mkdir -p client/public/audio/sounds
+          unzip -o sounds.zip -d client/public/audio/sounds
+          find client/public/audio/sounds -type f
+
+      - name: Commit extracted audio files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/public/audio/sounds
+          if git diff --cached --quiet; then
+            echo "No extracted-file changes to commit."
+          else
+            git commit -m "Extract sound assets"
+            git push
+          fi
