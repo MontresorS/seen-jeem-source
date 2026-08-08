@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X } from "lucide-react";
+import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { LIFELINES, useGame, type LifelineKey, type Outcome } from "./state";
@@ -98,6 +98,9 @@ export default function QuestionView() {
   const isLogos = catKey === "logos";
   const isFirstLetter = catKey === "firstletter";
   const isMoving = catKey === "moving";
+  const isOrdering = catKey === "ordering";
+  const isSounds = catKey === "sounds";
+  const isCities = catKey === "cities";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
 
@@ -126,6 +129,15 @@ export default function QuestionView() {
     setPlays((p) => p + 1);
     audioRef.current.currentTime = 0;
     audioRef.current.play().catch(() => setPlaying(false));
+  };
+
+  const playSoundEffect = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(`صوت ${activeCell.question.a}`);
+      utter.lang = 'ar-SA';
+      window.speechSynthesis.speak(utter);
+    }
   };
 
   const total = call !== null ? CALL : stage === "main" ? MAIN : SECOND;
@@ -159,9 +171,9 @@ export default function QuestionView() {
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
           <span className="flex items-center gap-2 text-sm font-extrabold sm:text-base 2xl:text-3xl">
             <span aria-hidden className="text-xl 2xl:text-4xl">
-              {cat.emoji}
+              {cat?.emoji || "🎯"}
             </span>
-            {cat.name}
+            {cat?.name || "سؤال"}
           </span>
           <span
             className="sj-tick rounded-full bg-primary px-3 py-1 text-base font-black text-primary-foreground 2xl:px-5 2xl:text-3xl"
@@ -200,6 +212,32 @@ export default function QuestionView() {
                     : "متبقي إعادة واحدة"}
               </p>
             </div>
+          ) : isSounds ? (
+            <div className="flex flex-col items-center gap-4" data-testid="block-sounds">
+              <p dir="rtl" className="break-words text-center text-2xl font-extrabold text-secondary dark:text-foreground sm:text-3xl 2xl:text-5xl">
+                🔊 استمع إلى الصوت وخمّن ماهيته!
+              </p>
+              <Button
+                onClick={playSoundEffect}
+                className="sj-press h-16 rounded-full border-2 border-primary-border px-8 text-lg font-black sj-shadow 2xl:h-20 2xl:px-12 2xl:text-3xl"
+              >
+                <Volume2 className="ml-2 h-7 w-7" /> اضغط للاستماع للصوت 🔊
+              </Button>
+            </div>
+          ) : isCities ? (
+            <div className="flex flex-col items-center gap-3" data-testid="block-cities">
+              <div className="flex items-center gap-2 text-primary">
+                <MapPin className="h-6 w-6 sm:h-8 sm:w-8" />
+                <span className="text-base font-extrabold sm:text-lg 2xl:text-2xl">معلومات عن المدينة:</span>
+              </div>
+              <p
+                data-testid="text-question"
+                dir="rtl"
+                className="break-words text-center text-xl font-extrabold leading-relaxed text-secondary dark:text-foreground sm:text-2xl 2xl:text-4xl"
+              >
+                {activeCell.question.q}
+              </p>
+            </div>
           ) : (
             <p
               data-testid="text-question"
@@ -213,6 +251,29 @@ export default function QuestionView() {
             </p>
           )}
 
+          {isOrdering && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-ordering">
+              <div className="w-full max-w-xl rounded-2xl border-2 border-card-border bg-muted/30 p-4 text-center">
+                <span className="text-xs font-bold text-muted-foreground sm:text-sm 2xl:text-lg">العناصر غير مرتبة — قم بترتيبها:</span>
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  {activeCell.question.q.includes("[") ? (
+                    activeCell.question.q.split("[")[1]?.split("]")[0]?.split("،").map((item, idx) => (
+                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
+                        {item.trim()}
+                      </span>
+                    ))
+                  ) : (
+                    activeCell.question.a.split("➔").sort(() => 0.5 - ((qhash + idx) % 10) / 10).map((item, idx) => (
+                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
+                        {item.trim()}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {isFirstLetter && (
             <div className="mt-4 flex items-center justify-center gap-2" data-testid="block-first-letter">
               <span className="text-sm font-bold text-muted-foreground 2xl:text-2xl">أول حرف من الإجابة:</span>
@@ -224,20 +285,46 @@ export default function QuestionView() {
 
           {isMoving && (
             <div
-              className="relative mx-auto mt-4 h-44 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-dashed border-card-border bg-muted/50 2xl:h-64"
+              className="relative mx-auto mt-4 h-48 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-dashed border-card-border bg-muted/50 p-4 2xl:h-72"
               data-testid="block-moving-letters"
             >
               {movingLetters.map((ch, i) => {
+                const totalLetters = movingLetters.length;
+                const cols = Math.ceil(Math.sqrt(totalLetters * 1.5));
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const maxRows = Math.ceil(totalLetters / cols);
+                
+                const colWidth = 82 / Math.max(cols, 1);
+                const rowHeight = 72 / Math.max(maxRows, 1);
+                
+                const baseLeft = 6 + col * colWidth;
+                const baseTop = 8 + row * rowHeight;
+                
                 const h = hashStr(`${activeCell.question.id}-${i}`);
-                const left = 8 + (h % 78);
-                const top = 10 + ((h >> 4) % 62);
-                const dur = 2.6 + ((h >> 8) % 26) / 10;
-                const delay = -((h >> 5) % 30) / 10;
+                const jitterLeft = (h % 10) - 5;
+                const jitterTop = ((h >> 3) % 8) - 4;
+                
+                const left = Math.max(4, Math.min(84, baseLeft + jitterLeft));
+                const top = Math.max(4, Math.min(78, baseTop + jitterTop));
+                
+                const animClass = `sj-drift-${(i % 4) + 1}`;
+                const dur = 2.8 + ((h >> 4) % 20) / 10;
+                const delay = -((h >> 2) % 25) / 10;
+
                 return (
                   <span
                     key={i}
-                    className="sj-drift absolute text-4xl font-black text-secondary dark:text-foreground 2xl:text-6xl"
-                    style={{ left: `${left}%`, top: `${top}%`, animationDuration: `${dur}s`, animationDelay: `${delay}s` }}
+                    className={cn(
+                      "absolute text-4xl font-black text-secondary dark:text-foreground sm:text-5xl 2xl:text-7xl",
+                      animClass
+                    )}
+                    style={{
+                      left: `${left}%`,
+                      top: `${top}%`,
+                      animationDuration: `${dur}s`,
+                      animationDelay: `${delay}s`,
+                    }}
                   >
                     {ch}
                   </span>
@@ -252,245 +339,149 @@ export default function QuestionView() {
                 <img
                   src={activeCell.question.image}
                   alt="صورة السؤال"
-                  loading="eager"
-                  data-testid="img-question"
-                  className="h-auto max-h-[34vh] w-auto max-w-[340px] object-contain transition-all duration-700 ease-out sm:max-w-[440px] lg:max-h-[38vh] 2xl:max-w-[620px]"
+                  className={cn(
+                    "max-h-[260px] w-auto max-w-full object-contain transition-all duration-500 sm:max-h-[340px] 2xl:max-h-[500px]",
+                    isWadda7 && (clarify === 0 ? "blur-xl" : clarify === 1 ? "blur-md" : "blur-0"),
+                  )}
                   style={
-                    isWadda7
-                      ? { filter: revealed ? "blur(0)" : `blur(${[26, 12, 5][clarify]}px)` }
-                      : {
-                          transform: revealed ? "scale(1)" : `scale(${zoomScale})`,
-                          transformOrigin: zoomOrigin,
-                        }
+                    isZoom
+                      ? { transform: `scale(${zoomScale})`, transformOrigin: zoomOrigin }
+                      : undefined
                   }
                 />
               </div>
-              {isWadda7 && !revealed && (
-                <Button
-                  variant="outline"
-                  data-testid="button-clarify"
-                  disabled={clarify >= WADDA7_STEPS.length - 1}
-                  onClick={() => setClarify((c) => Math.min(c + 1, WADDA7_STEPS.length - 1))}
-                  className="sj-press rounded-full border-2 border-primary font-black text-primary 2xl:h-14 2xl:px-8 2xl:text-2xl"
-                >
-                  🌫️ وضّح شوية — تنزل لـ{clarify === 0 ? "٤٠٠" : "٢٠٠"}
-                  <span className="mr-2 rounded-full bg-primary/10 px-2 text-xs font-black 2xl:text-lg">
-                    ×{WADDA7_STEPS.length - 1 - clarify}
+
+              {isWadda7 && (
+                <div className="flex flex-col items-center gap-1.5" data-testid="block-wadda7-controls">
+                  <Button
+                    data-testid="button-wadda7-more"
+                    disabled={clarify >= 2 || revealed}
+                    onClick={() => setClarify((c) => Math.min(2, c + 1))}
+                    variant="secondary"
+                    className="rounded-full border-2 font-bold 2xl:h-12 2xl:px-6 2xl:text-xl"
+                  >
+                    🔍 وضّح شوية ({clarify === 0 ? "وضّح أكتر ← ٤٠٠ نقطة" : "وضّح تماماً ← ٢٠٠ نقطة"})
+                  </Button>
+                  <span className="text-xs font-bold text-muted-foreground 2xl:text-lg">
+                    {clarify === 0
+                      ? "الصورة مغطاة بالكامل (٦٠٠ نقطة)"
+                      : clarify === 1
+                        ? "الصورة شبه واضحة (٤٠٠ نقطة)"
+                        : "الصورة واضحة تماماً (٢٠٠ نقطة)"}
                   </span>
-                </Button>
+                </div>
               )}
             </div>
           )}
 
-          {hasImage && isLogos && (
-            <div className="mt-4 flex justify-center">
-              <div className="relative flex h-56 w-72 items-center justify-center overflow-hidden rounded-2xl border-4 border-card-border bg-white p-6 sj-shadow sm:h-64 sm:w-80 2xl:h-96 2xl:w-[30rem]">
-                <img
-                  src={activeCell.question.image}
-                  alt="شعار"
-                  loading="eager"
-                  data-testid="img-question"
-                  className="h-full w-full object-contain"
-                />
+          {isLogos && (
+            <div className="mt-4 flex justify-center" data-testid="block-logo-mask">
+              <div className="relative overflow-hidden rounded-2xl border-4 border-card-border bg-white p-4 shadow-inner dark:bg-card">
+                <span className="text-7xl font-black sm:text-9xl 2xl:text-[12rem]">
+                  {activeCell.question.q}
+                </span>
                 {!revealed &&
                   logoMask.map((m, i) => (
                     <div
                       key={i}
-                      className="absolute flex items-center justify-center rounded-xl bg-secondary text-3xl font-black text-secondary-foreground 2xl:text-5xl"
+                      className="absolute bg-secondary dark:bg-card"
                       style={{ left: `${m.left}%`, top: `${m.top}%`, width: `${m.w}%`, height: `${m.h}%` }}
-                    >
-                      ؟
-                    </div>
+                    />
                   ))}
               </div>
             </div>
           )}
 
-          {hasImage && !isWadda7 && !isZoom && !isLogos && (
-            <div className="mt-4 flex justify-center">
-              <img
-                src={activeCell.question.image}
-                alt="صورة السؤال"
-                crossOrigin="anonymous"
-                referrerPolicy="no-referrer"
-                loading="eager"
-                data-testid="img-question"
-                className="h-auto max-h-[30vh] w-auto max-w-[300px] rounded-2xl border-4 border-card-border bg-muted object-contain sj-shadow sm:max-w-[400px] lg:max-h-[34vh] 2xl:max-w-[560px]"
-              />
-            </div>
-          )}
+          <div className="mt-6 flex flex-col items-center gap-4 sm:mt-8">
+            <CircleTimer seconds={shown} total={total} label={label} paused={!running || revealed} />
 
-          {active.hole && (
-            <p
-              className="mx-auto mt-4 w-fit rounded-full border-2 border-amber-500 bg-amber-100 px-3 py-1 text-xs font-extrabold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
-              data-testid="badge-hole"
-            >
-              🕳️ الحفرة مفعّلة: إذا جاوب {asking.name} صح، ينقص {effectivePoints} من {other.name}
-            </p>
-          )}
-
-          {!revealed && (
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <CircleTimer
-                seconds={shown}
-                total={total}
-                label={label}
-                tone={call !== null ? "call" : stage === "second" ? "danger" : "primary"}
-              />
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  className="rounded-full border-2 font-bold"
-                  data-testid="button-toggle-timer"
-                  onClick={() => setRunning((r) => !r)}
-                  disabled={stage === "over" && call === null}
-                >
-                  {running ? <Pause className="ml-1 h-4 w-4" /> : <Play className="ml-1 h-4 w-4" />}
-                  {running ? "إيقاف مؤقت" : "استمرار"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded-full border-2 font-bold"
-                  data-testid="button-reset-timer"
-                  onClick={() => {
-                    setStage("main");
-                    setSeconds(MAIN);
-                    setCall(null);
-                    setRunning(true);
-                  }}
-                >
-                  <RotateCcw className="ml-1 h-4 w-4" /> إعادة الوقت
-                </Button>
-                {stage === "main" && (
-                  <Button
-                    variant="outline"
-                    className="rounded-full border-2 font-bold"
-                    data-testid="button-skip-to-second"
-                    onClick={() => {
-                      setStage("second");
-                      setSeconds(SECOND);
-                      setRunning(true);
-                    }}
-                  >
-                    انتقل لوقت {other.name}
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {revealed && (
-            <div className="sj-pop mt-6 rounded-2xl border-2 border-primary bg-primary/10 p-5 text-center">
-              <p className="mb-1 text-xs font-bold text-primary">الإجابة الصحيحة</p>
-              <p
-                data-testid="text-answer"
-                className="break-words text-2xl font-black leading-relaxed text-secondary dark:text-foreground sm:text-3xl 2xl:text-6xl"
-              >
-                {activeCell.question.a}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* lifelines */}
-        <div className="border-t-2 border-card-border bg-muted/60 px-4 py-3">
-          <p className="mb-2 text-xs font-extrabold text-muted-foreground">
-            وسائل المساعدة — {asking.name}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {LIFELINES.filter((l) => l.when === "after").map((l) => (
-              <LifelineChip
-                key={l.key}
-                meta={l}
-                used={asking.used[l.key]}
+            {!revealed ? (
+              <Button
+                data-testid="button-reveal"
                 onClick={() => {
-                  dispatch({ type: "USE_LIFELINE", key: l.key, team: active.askingTeam });
-                  if (l.key === "phone") {
-                    setCall(CALL);
-                    setRunning(true);
-                  }
+                  setRevealed(true);
+                  setRunning(false);
                 }}
-              />
-            ))}
+                className="sj-press h-14 w-full max-w-md rounded-2xl border-2 border-primary-border text-lg font-black sj-shadow 2xl:h-20 2xl:max-w-xl 2xl:text-3xl"
+              >
+                <Eye className="ml-2 h-5 w-5 2xl:h-8 2xl:w-8" /> أظهر الإجابة
+              </Button>
+            ) : (
+              <div
+                dir="rtl"
+                data-testid="text-answer"
+                className="sj-pop w-full max-w-2xl rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 p-4 text-center dark:bg-emerald-950/30 2xl:p-6"
+              >
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 2xl:text-xl">
+                  الإجابة الصحيحة:
+                </span>
+                <p className="mt-1 text-2xl font-black text-emerald-900 dark:text-emerald-100 sm:text-3xl 2xl:text-5xl">
+                  {activeCell.question.a}
+                </p>
+              </div>
+            )}
           </div>
 
-          {usedLifelines.filter((k) => k !== "hole").length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              {usedLifelines
-                .filter((k) => k !== "hole")
-                .map((k) => {
-                  const meta = LIFELINES.find((l) => l.key === k)!;
-                  const teamName = state.teams[active.lifelines[k]!].name;
-                  const note =
-                    k === "double"
-                      ? `${teamName} يقدر يجاوب بجوابين — يكفي أن يكون أحدهما صحيحاً.`
-                      : k === "trap"
-                        ? `السؤال انتقل إلى ${other.name} — وإذا جاوب غلط ينقص ${effectivePoints} من رصيده.`
-                        : k === "rest"
-                          ? `على ${teamName} اختيار لاعب من ${other.name} ليستريح عن الإجابة على هذا السؤال.`
-                          : `مكالمة ٣٠ ثانية لصديق ${teamName}.`;
-                  return (
-                    <p
-                      key={k}
-                      data-testid={`banner-lifeline-${k}`}
-                      className={cn(
-                        "flex items-center gap-2 rounded-xl border-2 px-3 py-1.5 text-xs font-bold",
-                        meta.tone,
-                      )}
-                    >
-                      <LifelineIcon k={k} />
-                      {note}
-                    </p>
-                  );
-                })}
+          <div className="mt-6 border-t-2 border-card-border pt-4">
+            <p className="mb-2 text-center text-xs font-bold text-muted-foreground 2xl:text-lg">
+              وسائل المساعدة المستخدمة للسؤال:
+            </p>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {usedLifelines.length === 0 ? (
+                <span className="text-xs text-muted-foreground 2xl:text-base">لم تُستخدم أي وسيلة</span>
+              ) : (
+                usedLifelines.map((k) => (
+                  <LifelineChip key={k} lifelineKey={k} teamName={state.teams[active.lifelines[k]!].name} />
+                ))
+              )}
+            </div>
+
+            {!revealed && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="button-call-friend"
+                  disabled={call !== null}
+                  onClick={() => setCall(CALL)}
+                  className="rounded-full border-2 text-xs font-bold 2xl:h-11 2xl:px-4 2xl:text-lg"
+                >
+                  <LifelineIcon name="phone" className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
+                  اتصال بصديق (٣٠ ث)
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {revealed && (
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
+              <Button
+                data-testid="button-correct"
+                onClick={() => resolve("correct")}
+                className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+              >
+                إجابة صحيحة (+{effectivePoints})
+              </Button>
+              <Button
+                data-testid="button-wrong"
+                onClick={() => resolve("wrong")}
+                variant="destructive"
+                className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+              >
+                إجابة خاطئة
+              </Button>
+              <Button
+                data-testid="button-skip"
+                onClick={() => resolve("skip")}
+                variant="outline"
+                className="rounded-2xl border-2 font-bold 2xl:h-20 2xl:text-2xl"
+              >
+                إلغاء / لا أحد
+              </Button>
             </div>
           )}
         </div>
       </div>
-
-      {!revealed ? (
-        <Button
-          data-testid="button-reveal"
-          onClick={() => setRevealed(true)}
-          className="sj-press mt-5 h-14 w-full rounded-2xl border-2 border-primary-border text-base font-black sj-shadow sm:text-lg 2xl:h-20 2xl:text-3xl"
-        >
-          <Eye className="ml-1 h-5 w-5" /> أظهر الإجابة
-        </Button>
-      ) : (
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <Button
-            data-testid="button-team1-correct"
-            onClick={() => resolve({ kind: "correct", team: 0 })}
-            className="sj-press h-14 rounded-2xl border-2 border-emerald-700 bg-emerald-600 text-sm font-black text-white hover:bg-emerald-600/90 sm:text-base 2xl:h-20 2xl:text-2xl"
-          >
-            {state.teams[0].name} جاوب صح
-          </Button>
-          <Button
-            data-testid="button-team2-correct"
-            onClick={() => resolve({ kind: "correct", team: 1 })}
-            className="sj-press h-14 rounded-2xl border-2 border-sky-700 bg-sky-600 text-sm font-black text-white hover:bg-sky-600/90 sm:text-base 2xl:h-20 2xl:text-2xl"
-          >
-            {state.teams[1].name} جاوب صح
-          </Button>
-          <Button
-            variant="outline"
-            data-testid="button-nobody"
-            onClick={() => resolve({ kind: "none" })}
-            className="sj-press h-14 rounded-2xl border-2 text-sm font-black sm:text-base 2xl:h-20 2xl:text-2xl"
-          >
-            <X className="ml-1 h-4 w-4" /> محدش جاوب
-          </Button>
-          {active.lifelines.trap !== undefined && (
-            <Button
-              data-testid="button-trap-wrong"
-              onClick={() => resolve({ kind: "trap-wrong" })}
-              className="sj-press h-14 rounded-2xl border-2 border-yellow-700 bg-yellow-500 text-sm font-black text-yellow-950 hover:bg-yellow-500/90 sm:col-span-3 sm:text-base"
-            >
-              💣 {other.name} جاوب غلط — اخصم {effectivePoints} منه
-            </Button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
