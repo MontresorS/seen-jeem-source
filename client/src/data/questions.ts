@@ -1552,7 +1552,7 @@ export const CATEGORIES: Category[] = [
       { id: "wadda7-39", points: 600, q: "ما هذا الشيء المأكول الموضح في الصورة الضبابية؟", a: "وجبة برجر لحم", image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80" },
       { id: "wadda7-40", points: 600, q: "ما هذه المركبة المائية الموضحة في الصورة الضبابية؟", a: "سفينة شراعية", image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80" },
     ],
-  },,
+  },
   {
     key: "zoom",
     name: "زوم",
@@ -1600,7 +1600,7 @@ export const CATEGORIES: Category[] = [
       { id: "zoom-39", points: 600, q: "خمن الشيء المقرب جداً في الصورة؟", a: "كرة مضرب (تنس)", image: "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?auto=format&fit=crop&w=600&q=80" },
       { id: "zoom-40", points: 600, q: "خمن المادة المقربة في الصورة؟", a: "حبوب قهوة حمصاء", image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=600&q=80" },
     ],
-  },,
+  },
 {
     key: "logos",
     name: "شعارات عالمية",
@@ -1742,7 +1742,7 @@ export const CATEGORIES: Category[] = [
       { id: "moving-59", points: 600, q: "أطول بناء دفاعي في التاريخ البشري", a: "سورالصينالعظيم" },
       { id: "moving-60", points: 600, q: "المكتبة الشهيرة في الإسكندرية القديمة", a: "مكتبةالإسكندرية" },
     ],
-  },,
+  },
   {
     key: "ordering",
     name: "ترتيب",
