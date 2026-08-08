@@ -276,7 +276,6 @@ export default function QuestionView() {
           )}
           
 {isFlags && (
-{isFlags && (
   <div className="mt-4 flex justify-center">
     <span className="text-[9rem] leading-none sm:text-[12rem] 2xl:text-[16rem]">
       {(() => {
