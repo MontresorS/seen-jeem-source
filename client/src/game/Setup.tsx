@@ -61,7 +61,7 @@ export default function Setup() {
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <Label htmlFor="game-name" className="text-xs font-bold 2xl:text-base">
+            <Label htmlFor="game-name" className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
               اسم اللعبة (اختياري)
             </Label>
             <Input
@@ -74,7 +74,7 @@ export default function Setup() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="team1" className="text-xs font-bold 2xl:text-base">
+            <Label htmlFor="team1" className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
               اسم الفريق الأول
             </Label>
             <Input
@@ -87,7 +87,7 @@ export default function Setup() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="team2" className="text-xs font-bold 2xl:text-base">
+            <Label htmlFor="team2" className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
               اسم الفريق الثاني
             </Label>
             <Input
