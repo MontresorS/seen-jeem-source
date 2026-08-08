@@ -46,11 +46,27 @@ if (soundCategory) {
 
 if (typeof window !== "undefined" && "speechSynthesis" in window) {
   let currentAudio: HTMLAudioElement | null = null;
+  const stopAudio = () => {
+    currentAudio?.pause();
+    currentAudio = null;
+  };
+  const nativePushState = window.history.pushState;
+  const nativeReplaceState = window.history.replaceState;
+  window.history.pushState = function (...args) {
+    stopAudio();
+    return nativePushState.apply(this, args);
+  };
+  window.history.replaceState = function (...args) {
+    stopAudio();
+    return nativeReplaceState.apply(this, args);
+  };
+  window.addEventListener("popstate", stopAudio);
+  window.addEventListener("pagehide", stopAudio);
   window.speechSynthesis.speak = (utterance: SpeechSynthesisUtterance) => {
     const answer = utterance.text.replace(/^صوت\s+/, "").trim();
     const filename = tracks.get(answer);
     if (!filename) return;
-    currentAudio?.pause();
+    stopAudio();
     currentAudio = new Audio(`/${filename}`);
     currentAudio.play().catch(() => undefined);
   };
