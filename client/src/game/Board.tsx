@@ -47,7 +47,7 @@ function TeamPanel({ index }: { index: TeamIndex }) {
           className="min-w-0 text-right"
           title="اجعل الدور على هذا الفريق"
         >
-          <p className="truncate text-base font-extrabold text-secondary dark:text-foreground sm:text-lg 2xl:text-3xl">
+          <p className="truncate text-base font-extrabold sm:text-lg 2xl:text-3xl" style={{ color: CATEGORY_TEXT_COLOR }}>
             {team.name}
           </p>
           <p className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground 2xl:text-lg">
