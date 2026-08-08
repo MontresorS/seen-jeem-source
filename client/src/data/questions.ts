@@ -1901,7 +1901,6 @@ export const CATEGORIES: Category[] = [
       { id: "emoji_quiz-40", points: 600, q: "🐦‍⬛ 🏴‍☠️ ⚓", a: "قراصنة الكاريبي" },
     ],
   },
-  }
 ];
 
 export const CATEGORY_BY_KEY: Record<string, Category> = Object.fromEntries(
