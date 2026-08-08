@@ -1,0 +1,5 @@
+button[data-testid*="-200-"] {
+  background-color: hsl(36 78% 95%) !important;
+  border-color: hsl(32 40% 70%) !important;
+  color: hsl(219 47% 15%) !important;
+}
