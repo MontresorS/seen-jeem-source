@@ -314,8 +314,8 @@ export default function QuestionView() {
                 const jitterLeft = (h % 10) - 5;
                 const jitterTop = ((h >> 3) % 8) - 4;
 
-                const left = Math.max(4, Math.min(84, baseLeft + jitterLeft));
-                const top = Math.max(4, Math.min(78, baseTop + jitterTop));
+                                                        const left = Math.max(10, Math.min(78, baseLeft + jitterLeft));
+                const top = Math.max(10, Math.min(68, baseTop + jitterTop));
 
                 const animClass = `sj-drift-${(i % 4) + 1}`;
                 const dur = 2.8 + ((h >> 4) % 20) / 10;
