@@ -70,7 +70,7 @@ function TeamPanel({ index }: { index: TeamIndex }) {
           </Button>
           <span
             data-testid={`text-score-${index + 1}`}
-            className="sj-tick min-w-[3.5rem] rounded-lg bg-secondary px-2 py-0.5 text-center text-xl font-black text-secondary-foreground sm:text-2xl 2xl:min-w-[7rem] 2xl:rounded-2xl 2xl:text-5xl"
+                    className="sj-tick min-w-[3.5rem] rounded-lg bg-secondary px-2 py-0.5 text-center text-xl font-black text-black sm:text-2xl 2xl:min-w-[7rem] 2xl:rounded-2xl 2xl:text-5xl"
           >
             {team.score}
           </span>
