@@ -108,9 +108,15 @@ export default function QuestionView() {
   const qhash = hashStr(activeCell.question.id);
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
   const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
-  const resolve = (outcome: Outcome) =>
+    const resolve = (kind: "correct" | "wrong" | "skip") => {
+    const outcome: Outcome =
+      kind === "correct"
+        ? { kind: "correct", team: active.askingTeam }
+        : kind === "wrong" && usedLifelines.includes("trap")
+          ? { kind: "trap-wrong" }
+          : { kind: "none" };
     dispatch({ type: "RESOLVE", outcome, pointsOverride: isWadda7 ? effectivePoints : undefined });
-  // زوم: مقدار التقريب حسب النقاط + نقطة ارتكاز ثابتة لكل سؤال
+  };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
   const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
   const logoMask = LOGO_MASKS[qhash % LOGO_MASKS.length];
