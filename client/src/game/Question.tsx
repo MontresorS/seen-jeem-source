@@ -442,21 +442,26 @@ export default function QuestionView() {
                 ))
               )}
             </div>
-            {!revealed && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid="button-call-friend"
-                  disabled={call !== null}
-                  onClick={() => setCall(CALL)}
-                  className="rounded-full border-2 text-xs font-bold 2xl:h-11 2xl:px-4 2xl:text-lg"
-                >
-                  <LifelineIcon name="phone" className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
-                  اتصال بصديق (٣٠ ث)
-                </Button>
-              </div>
-            )}
+           {!revealed && (
+  <div className="mt-4 flex flex-wrap justify-center gap-2">
+    {LIFELINES.map((l) => (
+      <Button
+        key={l.key}
+        size="sm"
+        variant="outline"
+        disabled={state.teams[active.askingTeam].used[l.key] || active.lifelines[l.key] !== undefined || (l.key === "phone" && call !== null)}
+        onClick={() => {
+          if (l.key === "phone") setCall(CALL);
+          dispatch({ type: "USE_LIFELINE", key: l.key, team: active.askingTeam });
+        }}
+        className="rounded-full border-2 text-xs font-bold 2xl:h-11 2xl:px-4 2xl:text-lg"
+      >
+        <LifelineIcon name={l.icon} className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
+        {l.name}
+      </Button>
+    ))}
+  </div>
+)}
           </div>
           {revealed && (
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
