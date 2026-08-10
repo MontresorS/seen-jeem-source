@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
+import { getApprovedZoomWadda7Asset } from "@/data/zoom-wadda7-approved-assets";
 import { playSoundQuestion } from "@/sound-mode";
 import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
 import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
@@ -212,6 +213,18 @@ export default function QuestionView() {
   const isDrawGuess = catKey === "drawguess";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
+  const approvedLocalAsset = (isZoom || isWadda7) ? getApprovedZoomWadda7Asset(activeCell.question.id) : undefined;
+  const approvedZoomImage = approvedLocalAsset?.category === "zoom" ? approvedLocalAsset.image : undefined;
+  const approvedWadda7Stages = approvedLocalAsset?.category === "wadda7" ? approvedLocalAsset.stages : undefined;
+  const activeImage =
+    isWadda7
+      ? (approvedWadda7Stages?.[clarify] ?? activeCell.question.image)
+      : isZoom
+        ? (approvedZoomImage ?? activeCell.question.image)
+        : activeCell.question.image;
+  const shouldApplyRuntimeWadda7Blur = isWadda7 && !approvedWadda7Stages;
+  const shouldApplyRuntimeZoomScale =
+    isZoom && !approvedZoomImage && !activeCell.question.image?.startsWith("./images/zoom/");
   // whoami scoring: first clue free, then deductions
   const whoamiPointSteps = (originalPoints: number): readonly number[] => {
     if (originalPoints === 600) return [600, 600, 400, 200] as const;
@@ -847,14 +860,14 @@ export default function QuestionView() {
             <div className="mt-4 flex flex-col items-center gap-3">
               <div className="overflow-hidden rounded-2xl border-4 border-card-border bg-muted sj-shadow">
                 <img
-                  src={activeCell.question.image}
+                  src={activeImage}
                   alt="صورة السؤال"
                   className={cn(
                     "max-h-[260px] w-auto max-w-full object-contain transition-all duration-500 sm:max-h-[340px] 2xl:max-h-[500px]",
-                    isWadda7 && (clarify === 0 ? "blur-xl" : clarify === 1 ? "blur-md" : "blur-0"),
+                    shouldApplyRuntimeWadda7Blur && (clarify === 0 ? "blur-xl" : clarify === 1 ? "blur-md" : "blur-0"),
                   )}
                   style={
-                    isZoom
+                    shouldApplyRuntimeZoomScale
                       ? { transform: `scale(${zoomScale})`, transformOrigin: zoomOrigin }
                       : undefined
                   }
