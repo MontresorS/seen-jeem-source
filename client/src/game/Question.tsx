@@ -505,7 +505,7 @@ export default function QuestionView() {
             </div>
            {!revealed && (
   <div className="mt-4 flex flex-wrap justify-center gap-2">
-    {LIFELINES.map((l) => (
+    {LIFELINES.filter((l) => l.key !== "hole").map((l) => (
       <Button
         key={l.key}
         size="sm"

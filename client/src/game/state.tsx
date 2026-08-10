@@ -310,6 +310,8 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
     case "USE_LIFELINE": {
+      // hole must be armed before opening a question (ARM_HOLE -> OPEN). Disallow using hole while a question is open.
+      if (action.key === "hole") return state;
       if (!state.active) return state;
       const t = state.teams[action.team];
       if (t.used[action.key]) return state;
