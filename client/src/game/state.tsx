@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
 import { CATEGORIES, type Category, type Question } from "@/data/questions";
 
 export type TeamIndex = 0 | 1;
@@ -254,7 +254,8 @@ type Action =
   | { type: "RESOLVE_CHARADES"; guessed: boolean }
   | { type: "END" }
   | { type: "RESET" }
-  | { type: "RESET_USED" };
+  | { type: "RESET_USED" }
+  | { type: "LOAD_USED_IDS"; usedIds: string[] };
 
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
@@ -418,6 +419,8 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...initialState, usedIds: state.usedIds };
     case "RESET_USED":
       return { ...state, usedIds: [], recycledOnBoard: false };
+    case "LOAD_USED_IDS":
+      return { ...state, usedIds: action.usedIds };
     default:
       return state;
   }
@@ -443,6 +446,27 @@ const GameContext = createContext<Ctx | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  
+  // Load usedIds from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("seen-jeem-used-question-ids-v1");
+    if (stored) {
+      try {
+        const usedIds = JSON.parse(stored);
+        if (Array.isArray(usedIds)) {
+          dispatch({ type: "LOAD_USED_IDS", usedIds });
+        }
+      } catch {
+        // Silently ignore malformed data
+      }
+    }
+  }, []);
+
+  // Save usedIds to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem("seen-jeem-used-question-ids-v1", JSON.stringify(state.usedIds));
+  }, [state.usedIds]);
+
   const value = useMemo<Ctx>(() => {
     const activeCell = state.active
       ? state.cells.find((c) => c.id === state.active!.cellId) ?? null
