@@ -190,7 +190,8 @@ export default function QuestionView() {
   const playSoundEffect = () => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(`صوت ${activeCell.question.a}`);
+      const textToSpeak = isReversed ? reversedText : activeCell.question.a;
+      const utter = new SpeechSynthesisUtterance(`صوت ${textToSpeak}`);
       utter.lang = 'ar-SA';
       window.speechSynthesis.speak(utter);
     }
