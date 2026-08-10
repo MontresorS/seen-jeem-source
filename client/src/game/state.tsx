@@ -515,10 +515,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrationComplete]);
 
-  // Save snapshot on visibility change
+  // Save snapshot on visibility change and pagehide
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden" && state.phase !== "setup" && state.phase !== "results") {
+    const saveSnapshot = () => {
+      if (state.phase !== "setup" && state.phase !== "results") {
         try {
           const snapshot = {
             version: 1,
@@ -542,8 +542,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
         }
       }
     };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveSnapshot();
+      }
+    };
+    
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveSnapshot);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveSnapshot);
+    };
   }, [state]);
 
   const value = useMemo<Ctx>(() => {
