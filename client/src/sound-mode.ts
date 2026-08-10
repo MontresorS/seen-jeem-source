@@ -1,5 +1,3 @@
-import { CATEGORIES } from "./data/questions";
-
 const sounds = [
   ["صوت صفارة الشرطة", "11325622-police-siren-sound-effect-240674.mp3"],
   ["هتاف جمهور مباراة كرة القدم", "arunangshubanerjee-live-football-match-stadium-crowd-cheering-563439.mp3"],
@@ -33,16 +31,7 @@ const sounds = [
   ["ثغاء الخروف", "universfield-sheep-bleat-122256.mp3"],
 ] as const;
 
-const soundCategory = CATEGORIES.find((category) => category.key === "sounds");
 const tracks = new Map(sounds);
-
-if (soundCategory) {
-  soundCategory.questions.forEach((question, index) => {
-    const [answer] = sounds[index % sounds.length];
-    question.q = "خمن الصوت ده إيه؟";
-    question.a = answer;
-  });
-}
 
 if (typeof window !== "undefined" && "speechSynthesis" in window) {
   let currentAudio: HTMLAudioElement | null = null;
