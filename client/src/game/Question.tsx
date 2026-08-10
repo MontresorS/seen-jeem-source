@@ -141,6 +141,7 @@ export default function QuestionView() {
   const isBeforeAfter = catKey === "beforeafter";
   const isClosestNumber = catKey === "closestnumber";
   const isAudienceChoice = catKey === "audiencechoice";
+  const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
   const whoamiPointSteps = [600, 400, 200] as const;
