@@ -82,19 +82,3 @@ if (typeof window !== "undefined") {
   window.addEventListener("popstate", stopCurrentSound);
   window.addEventListener("pagehide", stopCurrentSound);
 }
-  const nativePushState = window.history.pushState;
-  const nativeReplaceState = window.history.replaceState;
-
-  window.history.pushState = function (...args) {
-    stopCurrentSound();
-    return nativePushState.apply(this, args);
-  };
-
-  window.history.replaceState = function (...args) {
-    stopCurrentSound();
-    return nativeReplaceState.apply(this, args);
-  };
-
-  window.addEventListener("popstate", stopCurrentSound);
-  window.addEventListener("pagehide", stopCurrentSound);
-}
