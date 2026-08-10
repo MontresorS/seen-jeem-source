@@ -224,7 +224,7 @@
 
 body {
   background-color: hsl(222 47% 7%) !important;
-  color: hsl(210 40% 98%) !important;
+    color: #000000 !important;
 }
 
 button {
