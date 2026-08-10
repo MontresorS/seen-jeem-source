@@ -1,0 +1,342 @@
+[
+  {
+    "id": "sounds-31",
+    "points": 200,
+    "answer": "سحّاب جاكيت",
+    "query": "zipper close jacket",
+    "filePath": "/sounds/sounds-31.mp3",
+    "fileSizeBytes": 97118,
+    "freesound": {
+      "id": 434478,
+      "name": "Zipper",
+      "username": "dersuperanton",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.80807,
+      "url": "https://freesound.org/people/dersuperanton/sounds/434478/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-32",
+    "points": 200,
+    "answer": "تقليب صفحات كتاب",
+    "query": "book pages flipping",
+    "filePath": "/sounds/sounds-32.mp3",
+    "fileSizeBytes": 27654,
+    "freesound": {
+      "id": 743744,
+      "name": "Paper flip",
+      "username": "DRuedaM",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.40481,
+      "url": "https://freesound.org/people/DRuedaM/sounds/743744/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-33",
+    "points": 200,
+    "answer": "سقوط مكعبات دومينو",
+    "query": "dominoes falling",
+    "filePath": "/sounds/sounds-33.mp3",
+    "fileSizeBytes": 76618,
+    "freesound": {
+      "id": 182125,
+      "name": "Domino 3.wav",
+      "username": "mmaruska",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 2.71485,
+      "url": "https://freesound.org/people/mmaruska/sounds/182125/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-34",
+    "points": 200,
+    "answer": "نرد يتدحرج على طاولة",
+    "query": "dice rolling wooden table",
+    "filePath": "/sounds/sounds-34.mp3",
+    "fileSizeBytes": 37216,
+    "freesound": {
+      "id": 220741,
+      "name": "dice_03.wav",
+      "username": "dermotte",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.16116,
+      "url": "https://freesound.org/people/dermotte/sounds/220741/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-35",
+    "points": 200,
+    "answer": "فتح علبة مشروب غازي",
+    "query": "soda can opening fizz",
+    "filePath": "/sounds/sounds-35.mp3",
+    "fileSizeBytes": 96288,
+    "freesound": {
+      "id": 652683,
+      "name": "soda_pop_fizz_open_can_click",
+      "username": "Geoff-Bremner-Audio",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.80075,
+      "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/652683/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-36",
+    "points": 200,
+    "answer": "آلة تدبيس ورق",
+    "query": "office stapler click",
+    "filePath": "/sounds/sounds-36.mp3",
+    "fileSizeBytes": 37157,
+    "freesound": {
+      "id": 756246,
+      "name": "Stapler 9",
+      "username": "Geoff-Bremner-Audio",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.41265,
+      "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/756246/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-37",
+    "points": 400,
+    "answer": "جرس مكتب معدني",
+    "query": "desk bell ring",
+    "filePath": "/sounds/sounds-37.mp3",
+    "fileSizeBytes": 59175,
+    "freesound": {
+      "id": 804776,
+      "name": "BELLHand-Samsung Galaxy Smartphone, CU_Desk, Winning Signal_Nicholas Judy_TDC",
+      "username": "designerschoice",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 2.3695,
+      "url": "https://freesound.org/people/designerschoice/sounds/804776/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-38",
+    "points": 400,
+    "answer": "مفتاح يُدار في قفل",
+    "query": "key turning lock",
+    "filePath": "/sounds/sounds-38.mp3",
+    "fileSizeBytes": 85121,
+    "freesound": {
+      "id": 423828,
+      "name": "Key unlocks a squeaky door, the door opens and gets closed 2",
+      "username": "crazymonke9",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.06694,
+      "url": "https://freesound.org/people/crazymonke9/sounds/423828/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-39",
+    "points": 400,
+    "answer": "تمزيق ورق",
+    "query": "paper tearing",
+    "filePath": "/sounds/sounds-39.mp3",
+    "fileSizeBytes": 31008,
+    "freesound": {
+      "id": 792939,
+      "name": "Paper Rip 1",
+      "username": "Geoff-Bremner-Audio",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.21542,
+      "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/792939/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-40",
+    "points": 400,
+    "answer": "ماء يمر في ماسورة",
+    "query": "water pipe",
+    "filePath": "/sounds/sounds-40.mp3",
+    "fileSizeBytes": 91008,
+    "freesound": {
+      "id": 102408,
+      "name": "IMPROV PERCS 071 2 BARS 130 BPM.wav",
+      "username": "sandyrb",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.69231,
+      "url": "https://freesound.org/people/sandyrb/sounds/102408/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-41",
+    "points": 400,
+    "answer": "فتح مظلة",
+    "query": "umbrella opening",
+    "filePath": "/sounds/sounds-41.mp3",
+    "fileSizeBytes": 34704,
+    "freesound": {
+      "id": 792074,
+      "name": "Umbrella Open 2 with subs",
+      "username": "Geoff-Bremner-Audio",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.38187,
+      "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/792074/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-42",
+    "points": 400,
+    "answer": "إغلاق باب سيارة",
+    "query": "car door close",
+    "filePath": "/sounds/sounds-42.mp3",
+    "fileSizeBytes": 51600,
+    "freesound": {
+      "id": 349048,
+      "name": "closing two car doors.wav",
+      "username": "phenoxyethanol",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 2.14419,
+      "url": "https://freesound.org/people/phenoxyethanol/sounds/349048/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-43",
+    "points": 400,
+    "answer": "إبرة أسطوانة فينيل",
+    "query": "vinyl record needle scratch",
+    "filePath": "/sounds/sounds-43.mp3",
+    "fileSizeBytes": 77442,
+    "freesound": {
+      "id": 810327,
+      "name": "Scratch Record Player",
+      "username": "mokasza",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.04433,
+      "url": "https://freesound.org/people/mokasza/sounds/810327/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-44",
+    "points": 600,
+    "answer": "جهاز عرض أفلام قديم",
+    "query": "vintage film projector running",
+    "filePath": "/sounds/sounds-44.mp3",
+    "fileSizeBytes": 133162,
+    "freesound": {
+      "id": 256652,
+      "name": "Super 8 mm setting up projector",
+      "username": "Eelke",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 5.28653,
+      "url": "https://freesound.org/people/Eelke/sounds/256652/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-45",
+    "points": 600,
+    "answer": "خلط أوراق اللعب",
+    "query": "cards shuffling",
+    "filePath": "/sounds/sounds-45.mp3",
+    "fileSizeBytes": 100848,
+    "freesound": {
+      "id": 45820,
+      "name": "shuffle2.wav",
+      "username": "themfish",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 4.13746,
+      "url": "https://freesound.org/people/themfish/sounds/45820/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-46",
+    "points": 600,
+    "answer": "وصول مصعد للطابق",
+    "query": "elevator arrival chime doors",
+    "filePath": "/sounds/sounds-46.mp3",
+    "fileSizeBytes": 124176,
+    "freesound": {
+      "id": 209863,
+      "name": "liftBong.wav",
+      "username": "davidbain",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 6.05714,
+      "url": "https://freesound.org/people/davidbain/sounds/209863/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-47",
+    "points": 600,
+    "answer": "آلة تسجيل نقدية قديمة",
+    "query": "old cash register mechanical",
+    "filePath": "/sounds/sounds-47.mp3",
+    "fileSizeBytes": 70286,
+    "freesound": {
+      "id": 810738,
+      "name": "Old-fashioned cash register",
+      "username": "mokasza",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.04433,
+      "url": "https://freesound.org/people/mokasza/sounds/810738/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-48",
+    "points": 600,
+    "answer": "فرقعة غلاف فقاعات",
+    "query": "bubble wrap popping",
+    "filePath": "/sounds/sounds-48.mp3",
+    "fileSizeBytes": 32977,
+    "freesound": {
+      "id": 757479,
+      "name": "Popping Bubble Wrap 11",
+      "username": "Geoff-Bremner-Audio",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 1.25494,
+      "url": "https://freesound.org/people/Geoff-Bremner-Audio/sounds/757479/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-49",
+    "points": 600,
+    "answer": "دقات ساعة ميكانيكية",
+    "query": "clock ticking",
+    "filePath": "/sounds/sounds-49.mp3",
+    "fileSizeBytes": 79212,
+    "freesound": {
+      "id": 686461,
+      "name": "time stops.wav",
+      "username": "lomowo",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "duration": 3.10605,
+      "url": "https://freesound.org/people/lomowo/sounds/686461/"
+    },
+    "status": "generated"
+  },
+  {
+    "id": "sounds-50",
+    "points": 600,
+    "answer": "مكعبات ثلج في كوب",
+    "query": "ice cubes glass",
+    "filePath": "/sounds/sounds-50.mp3",
+    "fileSizeBytes": 54864,
+    "freesound": {
+      "id": 527325,
+      "name": "Ice Poured Into Drink",
+      "username": "Clearwavsound",
+      "license": "http://creativecommons.org/licenses/by/3.0/",
+      "duration": 2.4,
+      "url": "https://freesound.org/people/Clearwavsound/sounds/527325/"
+    },
+    "status": "generated"
+  }
+]
