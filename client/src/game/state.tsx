@@ -88,6 +88,8 @@ export interface Cell {
 export interface ActiveQuestion {
   cellId: string;
   askingTeam: TeamIndex;
+  /** If a trap was used, the answering opportunity is transferred here. Keep askingTeam as the original owner. */
+  trappedTo?: TeamIndex | null;
   hole: boolean;
   lifelines: Partial<Record<LifelineKey, TeamIndex>>;
 }
@@ -317,9 +319,9 @@ function reducer(state: GameState, action: Action): GameState {
             ...state.active,
             lifelines: { ...state.active.lifelines, [action.key]: action.team },
           };
-          // Trap transfers the answering opportunity to the opposing team
+          // Trap transfers the answering opportunity to the opposing team, but keep askingTeam as original owner.
           if (action.key === "trap") {
-            newActive.askingTeam = action.team === 0 ? 1 : 0;
+            newActive.trappedTo = action.team === 0 ? 1 : 0;
           }
           return {
             ...state,
@@ -347,7 +349,9 @@ function reducer(state: GameState, action: Action): GameState {
           teams[o] = { ...teams[o], score: teams[o].score - pts };
         }
       } else if (action.outcome.kind === "trap-wrong") {
-              const victim = action.outcome.team ?? active.askingTeam;
+        // Deduct points from the team that actually had the answering opportunity (trappedTo),
+        // otherwise fall back to whatever team the action specified or the original asking team.
+        const victim = action.outcome.team ?? (active.trappedTo !== undefined && active.trappedTo !== null ? active.trappedTo : active.askingTeam);
         teams[victim] = { ...teams[victim], score: teams[victim].score - pts };
       }
 
