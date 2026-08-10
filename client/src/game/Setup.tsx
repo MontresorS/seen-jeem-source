@@ -39,12 +39,15 @@ export default function Setup() {
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:pt-8 2xl:max-w-[1700px] 2xl:px-10">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Logo />
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
           <span
             data-testid="text-bank-total"
             className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-lg"
           >
             بنك الأسئلة: {totalQuestions} سؤال في {CATEGORIES.length} فئات
+          </span>
+          <span className="rounded-full border-2 border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary 2xl:text-lg">
+            {usedTotal > 0 && `استُخدم: ${usedTotal} | `}متبقي: {totalRemaining}
           </span>
           <HelpDialog />
         </div>

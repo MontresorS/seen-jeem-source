@@ -446,8 +446,9 @@ const GameContext = createContext<Ctx | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [hydrationComplete, setHydrationComplete] = React.useState(false);
   
-  // Load usedIds from localStorage on mount
+  // Load usedIds from localStorage on mount (hydration phase)
   useEffect(() => {
     const stored = localStorage.getItem("seen-jeem-used-question-ids-v1");
     if (stored) {
@@ -460,12 +461,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         // Silently ignore malformed data
       }
     }
+    // Mark hydration as complete
+    setHydrationComplete(true);
   }, []);
 
-  // Save usedIds to localStorage whenever they change
+  // Save usedIds to localStorage only AFTER hydration completes
   useEffect(() => {
-    localStorage.setItem("seen-jeem-used-question-ids-v1", JSON.stringify(state.usedIds));
-  }, [state.usedIds]);
+    if (hydrationComplete) {
+      localStorage.setItem("seen-jeem-used-question-ids-v1", JSON.stringify(state.usedIds));
+    }
+  }, [state.usedIds, hydrationComplete]);
 
   const value = useMemo<Ctx>(() => {
     const activeCell = state.active
