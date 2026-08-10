@@ -261,6 +261,12 @@ export default function QuestionView() {
                 {activeCell.question.q}
               </p>
             </div>
+          ) : isMoving ? (
+            <div className="flex flex-col items-center gap-3" data-testid="block-moving-instruction">
+              <p dir="rtl" className="break-words text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl" style={{ color: QUESTION_TEXT_COLOR }}>
+                🎈 رتّب الحروف وخمّن الكلمتين!
+              </p>
+            </div>
           ) : (
             <p
               data-testid="text-question"
