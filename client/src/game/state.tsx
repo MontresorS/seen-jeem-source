@@ -114,6 +114,10 @@ export interface GameState {
   usedIds: string[];
   /** true إذا اضطررنا لإعادة استخدام أسئلة قديمة في اللوحة الحالية */
   recycledOnBoard: boolean;
+  /** Timer state: timestamp when the current main/second timer will end (for QR mode restoration) */
+  timerEndTimestamp?: number;
+  /** Call timer state: timestamp when the 30-second call timer will end */
+  callEndTimestamp?: number;
 }
 
 const freshTeam = (name: string): Team => ({
@@ -256,6 +260,7 @@ type Action =
   | { type: "RESET" }
   | { type: "RESET_USED" }
   | { type: "LOAD_USED_IDS"; usedIds: string[] }
+  | { type: "SET_TIMER"; timerEndTimestamp?: number; callEndTimestamp?: number }
   | { type: "RESTORE_GAME"; state: GameState };
 
 function reducer(state: GameState, action: Action): GameState {
@@ -434,6 +439,8 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...state, usedIds: [], recycledOnBoard: false };
     case "LOAD_USED_IDS":
       return { ...state, usedIds: action.usedIds };
+    case "SET_TIMER":
+      return { ...state, timerEndTimestamp: action.timerEndTimestamp, callEndTimestamp: action.callEndTimestamp };
     case "RESTORE_GAME":
       return action.state;
     default:
@@ -506,6 +513,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
           charades: state.charades,
           usedIds: state.usedIds,
           recycledOnBoard: state.recycledOnBoard,
+          timerEndTimestamp: state.timerEndTimestamp,
+          callEndTimestamp: state.callEndTimestamp,
           timestamp: Date.now(),
         };
         localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));
@@ -534,6 +543,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
             charades: state.charades,
             usedIds: state.usedIds,
             recycledOnBoard: state.recycledOnBoard,
+            timerEndTimestamp: state.timerEndTimestamp,
+            callEndTimestamp: state.callEndTimestamp,
             timestamp: Date.now(),
           };
           localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));

@@ -84,6 +84,71 @@ export default function QuestionView() {
     setDraggedItem(null);
     setOrderingComparisonResult(null);
   }, [active?.cellId]);
+
+  // Restore timer from saved state on component mount
+  useEffect(() => {
+    if (!active?.cellId || !state.timerEndTimestamp) return;
+    
+    const now = Date.now();
+    const msRemaining = state.timerEndTimestamp - now;
+    
+    // Only restore if timer hasn't completely expired
+    if (msRemaining > 1000) {
+      const secondsRemaining = Math.ceil(msRemaining / 1000);
+      const catKey = activeCell?.catKey;
+      const isSilentFilms = catKey === "silentfilms";
+      const isDrawGuess = catKey === "drawguess";
+      
+      // For QR modes, timer ranges differ
+      const maxMain = isSilentFilms 
+        ? (activeCell?.points === 600 ? 60 : 90)
+        : isDrawGuess
+          ? 60
+          : MAIN;
+      
+      if (secondsRemaining <= maxMain) {
+        setSeconds(secondsRemaining);
+        setStage("main");
+        setRunning(true);
+      } else {
+        // Timer was in second stage
+        const secondStageSeconds = secondsRemaining - maxMain;
+        if (secondStageSeconds <= SECOND) {
+          setSeconds(secondStageSeconds);
+          setStage("second");
+          setRunning(true);
+        }
+      }
+    }
+  }, []);
+
+  // Restore call timer from saved state
+  useEffect(() => {
+    if (!state.callEndTimestamp) return;
+    
+    const now = Date.now();
+    const msRemaining = state.callEndTimestamp - now;
+    
+    if (msRemaining > 1000 && msRemaining <= CALL * 1000) {
+      setCall(Math.ceil(msRemaining / 1000));
+      setRunning(true);
+    }
+  }, []);
+
+  // Save timer state whenever it changes
+  useEffect(() => {
+    if (!active || !running) return;
+    
+    const now = Date.now();
+    const timerEndMs = now + (seconds * 1000);
+    const callEndMs = call !== null ? now + (call * 1000) : undefined;
+    
+    dispatch({
+      type: "SET_TIMER",
+      timerEndTimestamp: timerEndMs,
+      callEndTimestamp: callEndMs,
+    });
+  }, [seconds, call, running, active]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
     stageRef.current = stage;
@@ -224,7 +289,10 @@ export default function QuestionView() {
           variant="outline"
           className="rounded-full border-2 font-bold 2xl:h-12 2xl:text-lg"
           data-testid="button-back-to-board"
-          onClick={() => dispatch({ type: "CLOSE" })}
+          onClick={() => {
+            dispatch({ type: "SET_TIMER", timerEndTimestamp: undefined, callEndTimestamp: undefined });
+            dispatch({ type: "CLOSE" });
+          }}
         >
           <ArrowRight className="ml-1 h-4 w-4" /> تخطي / رجوع للوحة
         </Button>
