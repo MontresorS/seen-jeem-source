@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
+import { playSoundQuestion } from "@/sound-mode";
 import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
 import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
 import QRDisplay from "./QRDisplay";
@@ -256,13 +257,8 @@ export default function QuestionView() {
   };
 
   const playSoundEffect = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const textToSpeak = isReversed ? reversedText : activeCell.question.a;
-      const utter = new SpeechSynthesisUtterance(`صوت ${textToSpeak}`);
-      utter.lang = 'ar-SA';
-      window.speechSynthesis.speak(utter);
-    }
+    if (!isSounds) return;
+    playSoundQuestion(activeCell.question.id);
   };
 
   const total = call !== null 
