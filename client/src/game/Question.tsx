@@ -20,6 +20,22 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
+/** Convert Arabic/Western numerals to number */
+function parseNumber(input: string): number | null {
+  if (!input.trim()) return null;
+  // Replace Arabic numerals with Western
+  const arabicToWestern: Record<string, string> = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+  };
+  let converted = input;
+  for (const [ar, ws] of Object.entries(arabicToWestern)) {
+    converted = converted.replace(new RegExp(ar, 'g'), ws);
+  }
+  const num = parseInt(converted, 10);
+  return isNaN(num) ? null : num;
+}
+
 const LOGO_MASKS: { left: number; top: number; w: number; h: number }[][] = [
   [
     { left: 0, top: 0, w: 58, h: 58 },
@@ -52,10 +68,14 @@ export default function QuestionView() {
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
   const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
   const [clueLevel, setClueLevel] = useState(0); // 0 = no clues, 1 = first clue (600→400), 2 = second (400→200), 3 = third (200→100 or 200 min)
+  const [team1Guess, setTeam1Guess] = useState("");
+  const [team2Guess, setTeam2Guess] = useState("");
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
     setClueLevel(0);
+    setTeam1Guess("");
+    setTeam2Guess("");
   }, [active?.cellId]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
@@ -397,6 +417,89 @@ export default function QuestionView() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Closestnumber with numeric input */}
+          {isClosestNumber && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-closestnumber">
+              <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                <p className="mb-4 text-center text-sm font-bold text-primary sm:text-base">أدخل الرقم الصحيح لكل فريق</p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 1: {asking.name}</label>
+                    <input
+                      type="text"
+                      value={team1Guess}
+                      onChange={(e) => setTeam1Guess(e.target.value)}
+                      placeholder="أدخل الرقم"
+                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 2: {other.name}</label>
+                    <input
+                      type="text"
+                      value={team2Guess}
+                      onChange={(e) => setTeam2Guess(e.target.value)}
+                      placeholder="أدخل الرقم"
+                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+                {(team1Guess || team2Guess) && activeCell.question.numericAnswer !== undefined && (
+                  <div className="mt-3 rounded-lg bg-primary/10 p-3 text-center">
+                    {(() => {
+                      const n1 = parseNumber(team1Guess);
+                      const n2 = parseNumber(team2Guess);
+                      if (n1 === null && n2 === null) return <span className="text-xs text-muted-foreground">ادخل الأرقام</span>;
+                      const diff1 = n1 !== null ? Math.abs(n1 - activeCell.question.numericAnswer) : Infinity;
+                      const diff2 = n2 !== null ? Math.abs(n2 - activeCell.question.numericAnswer) : Infinity;
+                      if (diff1 === diff2 && diff1 !== Infinity) {
+                        return <span className="text-sm font-black text-primary">تعادل — لا نقاط</span>;
+                      }
+                      const winner = diff1 < diff2 ? asking.name : other.name;
+                      return <span className="text-sm font-black text-primary">الأقرب: {winner}</span>;
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Audiencechoice with percentage bars */}
+          {isAudienceChoice && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-audiencechoice">
+              {activeCell.question.audiencePercentages && (
+                <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                  <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm">نسب الاختيار:</p>
+                  <div className="space-y-2">
+                    {(activeCell.question.choices || []).map((choice, idx) => {
+                      const percentage = activeCell.question.audiencePercentages?.[choice] ?? 0;
+                      const isCorrect = activeCell.question.correctChoices?.includes(choice);
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span>{choice}</span>
+                            <span>{percentage}%</span>
+                          </div>
+                          <div className="h-4 overflow-hidden rounded-full bg-muted-foreground/20">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all",
+                                isCorrect ? "bg-green-500" : "bg-blue-500"
+                              )}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
