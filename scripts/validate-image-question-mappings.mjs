@@ -37,8 +37,11 @@ async function main() {
   const errors = [];
 
   for (const mapping of mappings) {
-    if (mapping.status !== 'approved') continue;
     const question = questionById.get(mapping.questionId);
+    if (!mapping.questionId) {
+      errors.push('Mapping is missing questionId.');
+      continue;
+    }
     if (!question) {
       errors.push(`Missing question ID: ${mapping.questionId}`);
       continue;
@@ -46,6 +49,9 @@ async function main() {
     if (!mapping.sourceImage) {
       errors.push(`Missing source image for ${mapping.questionId}`);
       continue;
+    }
+    if (!['pending-review', 'approved', 'needs-fixing'].includes(mapping.status)) {
+      errors.push(`Invalid status for ${mapping.questionId}: ${mapping.status}`);
     }
     if (mapping.mode !== question.mode) {
       errors.push(`Mode mismatch for ${mapping.questionId}: expected ${question.mode}, got ${mapping.mode}`);

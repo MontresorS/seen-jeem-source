@@ -1,6 +1,6 @@
-import { mkdir, readFile, readdir, stat, writeFile, access } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile, access } from 'node:fs/promises';
 import { constants as fsConstants } from 'node:fs';
-import { extname, join, relative, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import sharp from 'sharp';
 
 const repoRoot = process.cwd();
@@ -25,14 +25,25 @@ function toRepoRelative(targetPath) {
   return relative(repoRoot, targetPath).split('\\').join('/');
 }
 
-function parseQuestionIds(source) {
-  const ids = [];
+function parseQuestionMetadata(source) {
   const categoryBlocks = [...source.matchAll(/key:\s*"(zoom|wadda7)"([\s\S]*?)(?=\n\s*key:\s*"|\n\s*\]\s*,?\s*$)/g)];
+  const results = [];
   for (const [, categoryKey, block] of categoryBlocks) {
-    const matches = [...block.matchAll(/id:\s*"([^"]+)"/g)];
-    for (const match of matches) ids.push(match[1]);
+    const matches = [...block.matchAll(/\{\s*id:\s*"([^"]+)"\s*,\s*points:\s*(\d+)\s*,\s*q:\s*"([^"]+)"\s*,\s*a:\s*"([^"]+)"/g)];
+    for (const match of matches) {
+      results.push({ questionId: match[1], points: Number(match[2]), questionPrompt: match[3], arabicAnswer: match[4], mode: categoryKey });
+    }
   }
-  return ids;
+  return results;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 async function ensureFileExists(filePath) {
@@ -122,13 +133,16 @@ async function writeReviewHtml(manifest) {
     <title>Image Question Review</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 2rem; background: #f7f7f7; }
-      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
       .card { background: white; border-radius: 12px; padding: 1rem; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+      .card.invalid { border: 2px solid #c62828; }
       img { width: 100%; height: auto; border-radius: 8px; margin-bottom: 0.5rem; }
       .pill { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 999px; font-size: 0.8rem; margin-bottom: 0.5rem; }
       .approved { background: #e8f5e9; color: #1b5e20; }
       .needs-fixing { background: #ffebee; color: #b71c1c; }
       .pending { background: #fff3e0; color: #e65100; }
+      .invalid { background: #fff3f3; color: #b71c1c; }
+      .error { color: #b71c1c; font-weight: 600; }
     </style>
   </head>
   <body>
@@ -136,15 +150,18 @@ async function writeReviewHtml(manifest) {
     <p>Review each mapping, confirm the image matches the Arabic description, and then update the mapping status.</p>
     <div class="grid">
       ${manifest.map((entry) => `
-        <div class="card">
-          <div class="pill ${entry.status === 'approved' ? 'approved' : entry.status === 'needs-fixing' ? 'needs-fixing' : 'pending'}">${entry.status}</div>
-          <h3>${entry.questionId} · ${entry.mode} · ${entry.pointTier}</h3>
-          <p><strong>Prompt:</strong> ${entry.questionPrompt}</p>
-          <p><strong>Answer:</strong> ${entry.arabicAnswer}</p>
-          <p><strong>Source:</strong> ${entry.sourceImage}</p>
-          <img src="${entry.reviewImageUrl}" alt="${entry.questionId}" />
+        <div class="card ${entry.isInvalid ? 'invalid' : ''}">
+          <div class="pill ${entry.isInvalid ? 'invalid' : entry.status === 'approved' ? 'approved' : entry.status === 'needs-fixing' ? 'needs-fixing' : 'pending'}">${entry.isInvalid ? 'invalid' : entry.status}</div>
+          <h3>${escapeHtml(entry.questionId || 'missing')}</h3>
+          <p><strong>Mode:</strong> ${escapeHtml(entry.mode || 'unknown')}</p>
+          <p><strong>Prompt:</strong> ${escapeHtml(entry.questionPrompt || 'missing')}</p>
+          <p><strong>Answer:</strong> ${escapeHtml(entry.arabicAnswer || 'missing')}</p>
+          <p><strong>Points:</strong> ${escapeHtml(entry.pointTier || 'missing')}</p>
+          <p><strong>Source:</strong> ${escapeHtml(entry.sourceImage || 'missing')}</p>
+          ${entry.reviewImageUrl ? `<img src="${entry.reviewImageUrl}" alt="${escapeHtml(entry.questionId || 'review')}" />` : '<p class="error">No review image available.</p>'}
           <p><strong>Outputs:</strong></p>
-          <ul>${entry.generatedOutputs.map((output) => `<li><a href="${output.path}">${output.name}</a></li>`).join('')}</ul>
+          ${entry.generatedOutputs.length > 0 ? `<ul>${entry.generatedOutputs.map((output) => `<li><a href="${output.path}">${escapeHtml(output.name)}</a></li>`).join('')}</ul>` : '<p class="error">No generated outputs.</p>'}
+          ${entry.reason ? `<p class="error">${escapeHtml(entry.reason)}</p>` : ''}
         </div>
       `).join('')}
     </div>
@@ -159,26 +176,55 @@ async function main() {
   await ensureDir(tempGenerationDir);
   await ensureDir(publicImagesDir);
 
-  const sourceFiles = await listSourceImages(sourceImagesDir);
   const mappingsRaw = await readFile(mappingsPath, 'utf8').catch(() => '[]');
   const mappings = JSON.parse(mappingsRaw);
-  const allowedQuestionIds = parseQuestionIds(await readFile(questionsFile, 'utf8'));
+  const questionsSource = await readFile(questionsFile, 'utf8');
+  const questionMetadata = parseQuestionMetadata(questionsSource);
+  const allowedQuestionIds = new Set(questionMetadata.map((question) => question.questionId));
+  const questionById = new Map(questionMetadata.map((question) => [question.questionId, question]));
   const manifest = [];
 
   for (const mapping of mappings) {
-    if (!mapping.questionId || !mapping.mode || !mapping.sourceImage) continue;
+    const question = mapping.questionId ? questionById.get(mapping.questionId) : null;
+    const resolvedMode = question?.mode || mapping.mode || 'unknown';
+    const resolvedPrompt = question?.questionPrompt || mapping.questionPrompt || '';
+    const resolvedAnswer = question?.arabicAnswer || mapping.arabicAnswer || '';
+    const resolvedPoints = question?.points ?? mapping.points ?? '';
+
+    if (!mapping.questionId || !mapping.sourceImage || !resolvedMode || !resolvedPrompt || !resolvedAnswer || resolvedPoints === '') {
+      manifest.push({
+        questionId: mapping.questionId || 'missing',
+        mode: resolvedMode,
+        pointTier: resolvedPoints || 'missing',
+        questionPrompt: resolvedPrompt,
+        arabicAnswer: resolvedAnswer,
+        status: 'needs-fixing',
+        sourceImage: mapping.sourceImage || 'missing',
+        reviewImageUrl: '',
+        publicAssetPath: null,
+        generatedOutputs: [],
+        reason: 'Mapping is missing required question metadata or source image.',
+        isInvalid: true,
+      });
+      continue;
+    }
 
     const sourceImagePath = resolve(repoRoot, mapping.sourceImage);
     const exists = await ensureFileExists(sourceImagePath);
     if (!exists) {
       manifest.push({
         questionId: mapping.questionId,
-        mode: mapping.mode,
+        mode: resolvedMode,
+        pointTier: resolvedPoints,
+        questionPrompt: resolvedPrompt,
+        arabicAnswer: resolvedAnswer,
         status: 'needs-fixing',
         sourceImage: mapping.sourceImage,
         reviewImageUrl: '',
+        publicAssetPath: null,
         generatedOutputs: [],
         reason: 'Source image missing',
+        isInvalid: true,
       });
       continue;
     }
@@ -187,15 +233,47 @@ async function main() {
     const reviewEntryDir = resolve(reviewGeneratedDir, `${sourceStem}-${mapping.questionId}`);
     await ensureDir(reviewEntryDir);
 
-    const publicModeDir = resolve(publicImagesDir, mapping.mode);
+    const publicModeDir = resolve(publicImagesDir, resolvedMode);
     await ensureDir(publicModeDir);
 
     let generatedOutputs = [];
-    if (mapping.mode === 'zoom') {
+    if (resolvedMode === 'zoom') {
       generatedOutputs = await createZoomOutputs(sourceImagePath, reviewEntryDir, overwrite);
-    } else if (mapping.mode === 'wadda7') {
+    } else if (resolvedMode === 'wadda7') {
       generatedOutputs = await createWadda7Outputs(sourceImagePath, reviewEntryDir, overwrite);
     } else {
+      manifest.push({
+        questionId: mapping.questionId,
+        mode: resolvedMode,
+        pointTier: resolvedPoints,
+        questionPrompt: resolvedPrompt,
+        arabicAnswer: resolvedAnswer,
+        status: 'needs-fixing',
+        sourceImage: mapping.sourceImage,
+        reviewImageUrl: '',
+        publicAssetPath: null,
+        generatedOutputs: [],
+        reason: 'Mode is not supported for review generation.',
+        isInvalid: true,
+      });
+      continue;
+    }
+
+    if (generatedOutputs.length === 0) {
+      manifest.push({
+        questionId: mapping.questionId,
+        mode: resolvedMode,
+        pointTier: resolvedPoints,
+        questionPrompt: resolvedPrompt,
+        arabicAnswer: resolvedAnswer,
+        status: 'needs-fixing',
+        sourceImage: mapping.sourceImage,
+        reviewImageUrl: '',
+        publicAssetPath: null,
+        generatedOutputs: [],
+        reason: 'Generated output metadata is missing.',
+        isInvalid: true,
+      });
       continue;
     }
 
@@ -214,20 +292,22 @@ async function main() {
     const reviewImageUrl = reviewImage ? toRepoRelative(reviewImage) : '';
     manifest.push({
       questionId: mapping.questionId,
-      mode: mapping.mode,
-      pointTier: mapping.points || 600,
-      questionPrompt: mapping.questionPrompt || '',
-      arabicAnswer: mapping.arabicAnswer || '',
+      mode: resolvedMode,
+      pointTier: resolvedPoints,
+      questionPrompt: resolvedPrompt,
+      arabicAnswer: resolvedAnswer,
       status: mapping.status || 'pending-review',
       sourceImage: mapping.sourceImage,
       reviewImageUrl,
       publicAssetPath: selectedPublicAsset,
       generatedOutputs: generatedOutputs.map((output) => ({ name: output.name, path: toRepoRelative(resolve(reviewEntryDir, `${output.name}.jpg`)) })),
+      reason: '',
+      isInvalid: false,
     });
   }
 
   const validApproved = manifest.filter((entry) => entry.status === 'approved');
-  const invalidApproved = validApproved.filter((entry) => !allowedQuestionIds.includes(entry.questionId));
+  const invalidApproved = validApproved.filter((entry) => !allowedQuestionIds.has(entry.questionId));
   if (invalidApproved.length > 0) {
     throw new Error(`Approved mappings reference missing question IDs: ${invalidApproved.map((entry) => entry.questionId).join(', ')}`);
   }

@@ -45,14 +45,13 @@ Then open:
 Use:
 
 ```bash
-npm run update:image-mapping -- <status> <questionId> <mode> <sourceImage> <questionPrompt> <arabicAnswer> <points>
+npm run update:image-mapping -- <pending-review|approved|needs-fixing> <questionId> <sourceImagePath>
 ```
 
-Examples:
+Example:
 
 ```bash
-npm run update:image-mapping -- pending-review zoom-1 ./source-images/example.jpg
-npm run update:image-mapping -- pending-review wadda7-1 ./source-images/example.jpg
+npm run update:image-mapping -- pending-review zoom-1 ./source-images/pineapple.jpg
 ```
 
 ## Validate approved mappings
