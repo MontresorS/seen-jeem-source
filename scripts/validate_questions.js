@@ -124,12 +124,54 @@ function validateTrueFalse() {
 }
 
 
+function validateOrdering() {
+  const block = extractCategory('ordering');
+  if (!block) { console.log('No ordering category found'); return 1; }
+  const objRe = /\{([\s\S]*?)\}/g;
+  let m; let qs = [];
+  while ((m = objRe.exec(block))) {
+    const t = m[1];
+    const id = (t.match(/id:\s*"([^"]+)"/) || [])[1];
+    const points = parseInt((t.match(/points:\s*(\d+)/) || [])[1] || '0', 10);
+    const orderItemsMatch = t.match(/orderItems:\s*\[([\s\S]*?)\]/);
+    const correctOrderMatch = t.match(/correctOrder:\s*\[([\s\S]*?)\]/);
+    const orderItems = orderItemsMatch
+      ? orderItemsMatch[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+      : [];
+    const correctOrder = correctOrderMatch
+      ? correctOrderMatch[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+      : [];
+    qs.push({ id, points, orderItems, correctOrder });
+  }
+  let errors = 0;
+  if (qs.length !== 30) { console.error('ORDERING count != 30:', qs.length); errors++; }
+  for (const q of qs) {
+    if (![200,400,600].includes(q.points)) { console.error('ORDERING invalid points:', q.id, q.points); errors++; }
+    if (q.orderItems.length === 0) { console.error('ORDERING missing orderItems:', q.id); errors++; }
+    if (q.correctOrder.length === 0) { console.error('ORDERING missing correctOrder:', q.id); errors++; }
+    if (q.orderItems.length !== q.correctOrder.length) { 
+      console.error('ORDERING orderItems length != correctOrder length:', q.id, q.orderItems.length, q.correctOrder.length); 
+      errors++; 
+    }
+    const orderSet = new Set(q.orderItems);
+    const correctSet = new Set(q.correctOrder);
+    if (orderSet.size !== q.orderItems.length) { console.error('ORDERING has duplicate orderItems:', q.id); errors++; }
+    if (correctSet.size !== q.correctOrder.length) { console.error('ORDERING has duplicate correctOrder:', q.id); errors++; }
+    const orderStr = JSON.stringify([...q.orderItems].sort());
+    const correctStr = JSON.stringify([...q.correctOrder].sort());
+    if (orderStr !== correctStr) { console.error('ORDERING orderItems and correctOrder have different items:', q.id); errors++; }
+  }
+  return errors;
+}
+
+
 function run() {
   console.log('Validating reversed and moving categories...');
   let errs = 0;
   errs += validateTrueFalse();
   errs += validateReversed();
   errs += validateMoving();
+  errs += validateOrdering();
   if (errs === 0) console.log('Validation passed');
   else console.error('Validation found', errs, 'issues');
   process.exit(errs>0?1:0);

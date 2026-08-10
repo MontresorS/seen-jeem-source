@@ -70,12 +70,18 @@ export default function QuestionView() {
   const [clueLevel, setClueLevel] = useState(0); // 0 = no clues, 1 = first clue (600→400), 2 = second (400→200), 3 = third (200→100 or 200 min)
   const [team1Guess, setTeam1Guess] = useState("");
   const [team2Guess, setTeam2Guess] = useState("");
+  const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
     setClueLevel(0);
     setTeam1Guess("");
     setTeam2Guess("");
+    setSubmittedOrder([]);
+    setDraggedItem(null);
+    setOrderingComparisonResult(null);
   }, [active?.cellId]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
@@ -505,23 +511,137 @@ export default function QuestionView() {
 
           {isOrdering && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-ordering">
-              <div className="w-full max-w-xl rounded-2xl border-2 border-card-border bg-muted/30 p-4 text-center">
-                <span className="text-xs font-bold text-muted-foreground sm:text-sm 2xl:text-lg">العناصر غير مرتبة — قم بترتيبها:</span>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {activeCell.question.q.includes("[") ? (
-                    activeCell.question.q.split("[")[1]?.split("]")[0]?.split("،").map((item, idx) => (
-                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
-                        {item.trim()}
-                      </span>
-                    ))
-                  ) : (
-                    activeCell.question.a.split("➔").sort(() => 0.5 - ((qhash + idx) % 10) / 10).map((item, idx) => (
-                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
-                        {item.trim()}
-                      </span>
-                    ))
-                  )}
-                </div>
+              <div className="w-full max-w-2xl rounded-2xl border-2 border-card-border bg-muted/30 p-4">
+                <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm 2xl:text-base">
+                  رتّب العناصر:
+                </p>
+
+                {/* Initialize order from orderItems if not already set */}
+                {submittedOrder.length === 0 && activeCell.question.orderItems && submittedOrder.length === 0 ? (
+                  <div className="text-center text-xs text-muted-foreground">تحميل العناصر...</div>
+                ) : null}
+
+                {/* Current submitted order or shuffled if empty */}
+                {(() => {
+                  const currentOrder = submittedOrder.length > 0 
+                    ? submittedOrder
+                    : (activeCell.question.orderItems || []);
+                  
+                  if (currentOrder.length === 0) {
+                    return <div className="text-xs text-center text-muted-foreground">لا توجد عناصر للترتيب</div>;
+                  }
+
+                  return (
+                    <>
+                      {/* Ordered items */}
+                      <div className="space-y-2">
+                        {currentOrder.map((item, idx) => (
+                          <div
+                            key={`${item}-${idx}`}
+                            draggable
+                            onDragStart={() => setDraggedItem(item)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (!draggedItem || draggedItem === item) return;
+                              const newOrder = [...currentOrder];
+                              const fromIdx = newOrder.indexOf(draggedItem);
+                              if (fromIdx === -1) return;
+                              newOrder.splice(fromIdx, 1);
+                              newOrder.splice(idx, 0, draggedItem);
+                              setSubmittedOrder(newOrder);
+                              setDraggedItem(null);
+                            }}
+                            className={cn(
+                              "flex items-center justify-between rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all 2xl:text-base",
+                              draggedItem === item
+                                ? "border-primary/50 bg-primary/20 opacity-75"
+                                : "border-primary/30 bg-card cursor-move hover:border-primary/50"
+                            )}
+                          >
+                            <span className="text-xs text-muted-foreground font-bold 2xl:text-sm">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1 text-right px-3">{item}</span>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => {
+                                  if (idx > 0) {
+                                    const newOrder = [...currentOrder];
+                                    [newOrder[idx], newOrder[idx - 1]] = [
+                                      newOrder[idx - 1],
+                                      newOrder[idx],
+                                    ];
+                                    setSubmittedOrder(newOrder);
+                                  }
+                                }}
+                                disabled={idx === 0}
+                                className="rounded px-2 py-1 bg-primary/20 text-xs font-bold text-primary disabled:opacity-30 hover:bg-primary/30"
+                                title="رفع"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (idx < currentOrder.length - 1) {
+                                    const newOrder = [...currentOrder];
+                                    [newOrder[idx], newOrder[idx + 1]] = [
+                                      newOrder[idx + 1],
+                                      newOrder[idx],
+                                    ];
+                                    setSubmittedOrder(newOrder);
+                                  }
+                                }}
+                                disabled={idx === currentOrder.length - 1}
+                                className="rounded px-2 py-1 bg-primary/20 text-xs font-bold text-primary disabled:opacity-30 hover:bg-primary/30"
+                                title="خفض"
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Confirm button */}
+                      <button
+                        onClick={() => {
+                          if (activeCell.question.correctOrder) {
+                            const isCorrect =
+                              JSON.stringify(currentOrder) ===
+                              JSON.stringify(activeCell.question.correctOrder);
+                            setOrderingComparisonResult(isCorrect ? "correct" : "incorrect");
+                          }
+                        }}
+                        className="mt-4 w-full rounded-lg bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-primary/90 text-sm 2xl:text-base"
+                      >
+                        تأكيد الترتيب
+                      </button>
+
+                      {/* Comparison result */}
+                      {orderingComparisonResult === "correct" && (
+                        <div className="mt-3 rounded-lg bg-green-500/20 border-2 border-green-500 p-3 text-center">
+                          <span className="text-sm font-bold text-green-600 2xl:text-base">✓ الترتيب صحيح!</span>
+                        </div>
+                      )}
+                      {orderingComparisonResult === "incorrect" && (
+                        <div className="mt-3 rounded-lg bg-destructive/20 border-2 border-destructive p-3 text-center">
+                          <span className="text-sm font-bold text-destructive 2xl:text-base">✗ الترتيب خاطئ</span>
+                          {revealed && activeCell.question.correctOrder && (
+                            <div className="mt-2 space-y-1 text-xs">
+                              <p className="font-bold">الترتيب الصحيح:</p>
+                              {activeCell.question.correctOrder.map((item, idx) => (
+                                <div key={idx} className="text-foreground">
+                                  {idx + 1}. {item}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
