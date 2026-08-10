@@ -235,7 +235,7 @@ function buildCells(
 export type Outcome =
   | { kind: "correct"; team: TeamIndex }
   | { kind: "none" }
-  | { kind: "trap-wrong" };
+  | { kind: "trap-wrong"; team?: TeamIndex };
 
 type Action =
   | { type: "START"; gameName: string; names: [string, string]; catKeys: string[] }
@@ -313,12 +313,20 @@ function reducer(state: GameState, action: Action): GameState {
       if (t.used[action.key]) return state;
       const teams = [...state.teams] as [Team, Team];
       teams[action.team] = { ...t, used: { ...t.used, [action.key]: true } };
-      return {
-        ...state,
-        teams,
-        active: { ...state.active, lifelines: { ...state.active.lifelines, [action.key]: action.team } },
-      };
-    }
+          const newActive: ActiveQuestion = {
+            ...state.active,
+            lifelines: { ...state.active.lifelines, [action.key]: action.team },
+          };
+          // Trap transfers the answering opportunity to the opposing team
+          if (action.key === "trap") {
+            newActive.askingTeam = action.team === 0 ? 1 : 0;
+          }
+          return {
+            ...state,
+            teams,
+            active: newActive,
+          };
+        }
     case "CLOSE":
       return { ...state, phase: "board", active: null };
     case "RESOLVE": {
@@ -339,7 +347,7 @@ function reducer(state: GameState, action: Action): GameState {
           teams[o] = { ...teams[o], score: teams[o].score - pts };
         }
       } else if (action.outcome.kind === "trap-wrong") {
-        const victim = other(active.askingTeam);
+              const victim = action.outcome.team ?? active.askingTeam;
         teams[victim] = { ...teams[victim], score: teams[victim].score - pts };
       }
 
@@ -352,7 +360,7 @@ function reducer(state: GameState, action: Action): GameState {
         active: null,
         turn: other(active.askingTeam),
         phase: allUsed ? "results" : "board",
-        history: [...state.history, { question: cell.question, winner, points: pts }],
+              history: [...state.history, { question: cell.question, winner, points: action.outcome.kind === "trap-wrong" ? -pts : pts }],
       };
     }
     case "OPEN_CHARADES": {

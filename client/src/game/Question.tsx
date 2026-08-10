@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
-import { LIFELINES, useGame, type LifelineKey, type Outcome } from "./state";
+import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
 import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
 import { cn } from "@/lib/utils";
 
@@ -50,9 +50,10 @@ export default function QuestionView() {
   const [plays, setPlays] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const stageRef = useRef(stage);
-  stageRef.current = stage;
+    const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const stageRef = useRef(stage);
+    stageRef.current = stage;
 
   useEffect(() => {
     return () => {
@@ -108,20 +109,21 @@ export default function QuestionView() {
   const qhash = hashStr(activeCell.question.id);
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
   const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
-    const resolve = (kind: "correct" | "wrong" | "skip") => {
-    const outcome: Outcome =
-      kind === "correct"
-        ? { kind: "correct", team: active.askingTeam }
-        : kind === "wrong" && usedLifelines.includes("trap")
-          ? { kind: "trap-wrong" }
-          : { kind: "none" };
-    dispatch({ type: "RESOLVE", outcome, pointsOverride: isWadda7 ? effectivePoints : undefined });
+    const resolveCorrect = (team: 0 | 1) => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: isWadda7 ? effectivePoints : undefined });
+      };
+      const resolveNone = () => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "none" }, pointsOverride: isWadda7 ? effectivePoints : undefined });
+      };
+      const resolveTrapWrong = (victimTeam: 0 | 1) => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: isWadda7 ? effectivePoints : undefined });
   };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
   const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
   const logoMask = LOGO_MASKS[qhash % LOGO_MASKS.length];
+  const movingWords = isMoving ? activeCell.question.a.split(/\s+/) : [];
   const movingLetters = isMoving
-    ? activeCell.question.a.replace(/\s+/g, "").split("")
+    ? movingWords.flatMap((w, wi) => w.split("").map((ch) => ({ ch, wi })))
     : [];
 
   const playAudio = () => {
@@ -258,6 +260,46 @@ export default function QuestionView() {
               {activeCell.question.q}
             </p>
           )}
+
+          {/* MCQ choices rendering */}
+          {Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-choices">
+              <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+                {activeCell.question.choices.map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  const maxAllowed = active.lifelines.double === active.askingTeam ? 2 : 1;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        if (selected) setSelectedChoices((s) => s.filter((x) => x !== choice));
+                        else if (selectedChoices.length < maxAllowed) setSelectedChoices((s) => [...s, choice]);
+                      }}
+                      className={cn(
+                        "rounded-2xl border-2 px-3 py-2 text-sm font-black sm:text-base",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+              {Array.isArray(activeCell.question.correctChoices) && activeCell.question.correctChoices.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {selectedChoices.length > 0
+                    ? ((): JSX.Element => {
+                        const a = [...selectedChoices].sort().join("||");
+                        const b = [...activeCell.question.correctChoices!].sort().join("||");
+                        return <span>{a === b ? "اختيارات تتطابق مع الإجابات الصحيحة" : "اختيارات لا تطابق الإجابات الصحيحة"}</span>;
+                      })()
+                    : <span>اختر إجابة{active.lifelines.double === active.askingTeam ? " (مسموح باثنين)" : " (مسموح بواحدة)"}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           {isOrdering && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-ordering">
               <div className="w-full max-w-xl rounded-2xl border-2 border-card-border bg-muted/30 p-4 text-center">
@@ -303,48 +345,51 @@ export default function QuestionView() {
               className="relative mx-auto mt-4 h-48 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-dashed border-card-border bg-muted/50 p-4 2xl:h-72"
               data-testid="block-moving-letters"
             >
-              {movingLetters.map((ch, i) => {
-                const totalLetters = movingLetters.length;
-                const cols = Math.ceil(Math.sqrt(totalLetters * 1.5));
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const maxRows = Math.ceil(totalLetters / cols);
+              {movingLetters.map((item, i) => {
+                              const ch = item.ch;
+                              const wi = item.wi;
+                              const totalLetters = movingLetters.length;
+                              const cols = Math.ceil(Math.sqrt(totalLetters * 1.5));
+                              const col = i % cols;
+                              const row = Math.floor(i / cols);
+                              const maxRows = Math.ceil(totalLetters / cols);
 
-                const colWidth = 82 / Math.max(cols, 1);
-                const rowHeight = 72 / Math.max(maxRows, 1);
+                              const colWidth = 82 / Math.max(cols, 1);
+                              const rowHeight = 72 / Math.max(maxRows, 1);
 
-                const baseLeft = 6 + col * colWidth;
-                const baseTop = 8 + row * rowHeight;
+                              const baseLeft = 6 + col * colWidth;
+                              const baseTop = 8 + row * rowHeight;
 
-                const h = hashStr(`${activeCell.question.id}-${i}`);
-                const jitterLeft = (h % 10) - 5;
-                const jitterTop = ((h >> 3) % 8) - 4;
+                              const h = hashStr(`${activeCell.question.id}-${i}`);
+                              const jitterLeft = (h % 10) - 5;
+                              const jitterTop = ((h >> 3) % 8) - 4;
 
-                                                        const left = Math.max(10, Math.min(78, baseLeft + jitterLeft));
-                const top = Math.max(10, Math.min(68, baseTop + jitterTop));
+                              const left = Math.max(10, Math.min(78, baseLeft + jitterLeft));
+                              const top = Math.max(10, Math.min(68, baseTop + jitterTop));
 
-                const animClass = `sj-drift-${(i % 4) + 1}`;
-                const dur = 2.8 + ((h >> 4) % 20) / 10;
-                const delay = -((h >> 2) % 25) / 10;
-                return (
-                  <span
-                    key={i}
-                    className={cn(
-                      "absolute text-4xl font-black sm:text-5xl 2xl:text-7xl",
-                      animClass
-                    )}
-                    style={{
-                      left: `${left}%`,
-                      top: `${top}%`,
-                      animationDuration: `${dur}s`,
-                      animationDelay: `${delay}s`,
-                      color: QUESTION_TEXT_COLOR,
-                    }}
-                  >
-                    {ch}
-                  </span>
-                );
-              })}
+                              const animClass = `sj-drift-${(i % 4) + 1}`;
+                              const dur = 2.8 + ((h >> 4) % 20) / 10;
+                              const delay = -((h >> 2) % 25) / 10;
+                              const color = wi === 0 ? QUESTION_TEXT_COLOR : "#0B3D91";
+                              return (
+                                <span
+                                  key={i}
+                                  className={cn(
+                                    "absolute text-4xl font-black sm:text-5xl 2xl:text-7xl",
+                                    animClass
+                                  )}
+                                  style={{
+                                    left: `${left}%`,
+                                    top: `${top}%`,
+                                    animationDuration: `${dur}s`,
+                                    animationDelay: `${delay}s`,
+                                    color,
+                                  }}
+                                >
+                                  {ch}
+                                </span>
+                              );
+                            })}
             </div>
           )}
           {hasImage && (isWadda7 || isZoom) && (
@@ -438,7 +483,7 @@ export default function QuestionView() {
                 <span className="text-xs text-muted-foreground 2xl:text-base">لم تُستخدم أي وسيلة</span>
               ) : (
                 usedLifelines.map((k) => (
-                  <LifelineChip key={k} lifelineKey={k} teamName={state.teams[active.lifelines[k]!].name} />
+                  <LifelineChip key={k} meta={LIFELINE_BY_KEY[k]} used={true} compact />
                 ))
               )}
             </div>
@@ -449,14 +494,19 @@ export default function QuestionView() {
         key={l.key}
         size="sm"
         variant="outline"
-        disabled={state.teams[active.askingTeam].used[l.key] || active.lifelines[l.key] !== undefined || (l.key === "phone" && call !== null)}
+        disabled={
+          state.teams[active.askingTeam].used[l.key] ||
+          active.lifelines[l.key] !== undefined ||
+          (l.key === "phone" && call !== null) ||
+          (l.key === "double" && (!activeCell.question.choices || activeCell.question.choices.length === 0))
+        }
         onClick={() => {
           if (l.key === "phone") setCall(CALL);
           dispatch({ type: "USE_LIFELINE", key: l.key, team: active.askingTeam });
         }}
         className="rounded-full border-2 text-xs font-bold 2xl:h-11 2xl:px-4 2xl:text-lg"
       >
-        <LifelineIcon name={l.icon} className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
+        <LifelineIcon k={l.key} className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
         {l.name}
       </Button>
     ))}
@@ -466,30 +516,39 @@ export default function QuestionView() {
           {revealed && (
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
               <Button
-                data-testid="button-correct"
-                onClick={() => resolve("correct")}
+                          data-testid="button-team0-correct"
+                          onClick={() => resolveCorrect(0)}
                 className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
               >
-                إجابة صحيحة (+{effectivePoints})
+                          {state.teams[0].name} إجابة صحيحة (+{effectivePoints})
               </Button>
               <Button
-                data-testid="button-wrong"
-                onClick={() => resolve("wrong")}
-                variant="destructive"
-                className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
-              >
-                إجابة خاطئة
-              </Button>
-              <Button
-                data-testid="button-skip"
-                onClick={() => resolve("skip")}
-                variant="outline"
-                className="rounded-2xl border-2 font-bold 2xl:h-20 2xl:text-2xl"
-              >
-                إلغاء / لا أحد
-              </Button>
-            </div>
-          )}
+                          data-testid="button-team1-correct"
+                          onClick={() => resolveCorrect(1)}
+                          className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+                        >
+                          {state.teams[1].name} إجابة صحيحة (+{effectivePoints})
+                        </Button>
+                        <Button
+                          data-testid="button-skip"
+                          onClick={() => resolveNone()}
+                          variant="outline"
+                          className="rounded-2xl border-2 font-bold 2xl:h-20 2xl:text-2xl"
+                        >
+                          إلغاء / لا أحد
+                        </Button>
+                        {active.lifelines.trap !== undefined && (
+                          <Button
+                            data-testid="button-trap-wrong"
+                            onClick={() => resolveTrapWrong(active.askingTeam)}
+                            variant="destructive"
+                            className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+                          >
+                            {state.teams[active.askingTeam].name} إجابة خاطئة (-{effectivePoints})
+                          </Button>
+                        )}
+                      </div>
+                    )}
         </div>
       </div>
     </div>
