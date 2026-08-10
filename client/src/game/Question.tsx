@@ -245,7 +245,7 @@ export default function QuestionView() {
   const playAudio = () => {
     if (plays >= MAX_AUDIO_PLAYS || playing) return;
     if (!audioRef.current) {
-      const el = new Audio(`./audio/reversed/${activeCell.question.id}.mp3`);
+      const el = new Audio(`/reversed-audio-candidates-neural/${activeCell.question.id}-letters.mp3`);
       el.onended = () => setPlaying(false);
       el.onerror = () => setPlaying(false);
       audioRef.current = el;
