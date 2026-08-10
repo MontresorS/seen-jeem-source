@@ -2229,14 +2229,6 @@ export const CATEGORIES: Category[] = [
       { id: "ac-600-16", points: 600, q: "ما أكثر الآيات القرآنية تأثيراً في النفس المسلمة؟", a: "آية الكرسي", choices: ["يس", "آية الكرسي", "الفاتحة", "سورة الناس"], correctChoices: ["آية الكرسي"], audiencePercentages: {"يس": 25, "آية الكرسي": 45, "الفاتحة": 20, "سورة الناس": 10} }
      ]
    },
-];
-
-
-
-export const CATEGORY_BY_KEY: Record<string, Category> = Object.fromEntries(
-  CATEGORIES.map((c) => [c.key, c]),
-);
-
   {
     key: "silentfilms",
     name: "أفلام مصرية بدون كلام",
@@ -2358,6 +2350,10 @@ export const CATEGORY_BY_KEY: Record<string, Category> = Object.fromEntries(
     ]
   }
 ];
+
+export const CATEGORY_BY_KEY: Record<string, Category> = Object.fromEntries(
+  CATEGORIES.map((c) => [c.key, c]),
+);
 
 export const TOTAL_QUESTIONS = CATEGORIES.reduce((n, c) => n + c.questions.length, 0);
 
