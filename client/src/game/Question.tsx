@@ -50,10 +50,12 @@ export default function QuestionView() {
   const [plays, setPlays] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
-    const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+  const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+  const [clueLevel, setClueLevel] = useState(0); // 0 = no clues, 1 = first clue (600→400), 2 = second (400→200), 3 = third (200→100 or 200 min)
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
+    setClueLevel(0);
   }, [active?.cellId]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
@@ -109,21 +111,25 @@ export default function QuestionView() {
   const isOrdering = catKey === "ordering";
   const isSounds = catKey === "sounds";
   const isCities = catKey === "cities";
-  const hasImage = Boolean(activeCell.question.image);
+  const isWhoami = catKey === "whoami";
+  const isBeforeAfter = catKey === "beforeafter";
+  const isClosestNumber = catKey === "closestnumber";
+  const isAudienceChoice = catKey === "audiencechoice";
   const qhash = hashStr(activeCell.question.id);
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
-  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
+  const whoamiPointSteps = [600, 400, 200] as const;
+  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : (isWhoami ? whoamiPointSteps[Math.min(clueLevel, 2)] : activeCell.points);
   // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
   const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
   const answering = state.teams[answeringTeamIdx];
   const phoneOwnerName = state.teams[active.lifelines.phone ?? active.askingTeam].name;    const resolveCorrect = (team: 0 | 1) => {
-        dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: isWadda7 ? effectivePoints : undefined });
+        dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
       };
       const resolveNone = () => {
-        dispatch({ type: "RESOLVE", outcome: { kind: "none" }, pointsOverride: isWadda7 ? effectivePoints : undefined });
+        dispatch({ type: "RESOLVE", outcome: { kind: "none" }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
       };
       const resolveTrapWrong = (victimTeam: 0 | 1) => {
-        dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: isWadda7 ? effectivePoints : undefined });
+        dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
   };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
   const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
@@ -334,6 +340,63 @@ export default function QuestionView() {
                     : <span>اختر إجابة{active.lifelines.double === active.askingTeam ? " (مسموح باثنين)" : " (مسموح بواحدة)"}</span>}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Whoami with progressive clue reveal */}
+          {isWhoami && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-whoami">
+              <div className="w-full max-w-xl rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                <p className="mb-3 text-center text-sm font-bold text-primary sm:text-base">النقاط الحالية: {effectivePoints}</p>
+                <div className="flex flex-col gap-2">
+                  {activeCell.question.clues?.map((clue, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "rounded-lg border-2 px-4 py-2 text-sm transition-all sm:text-base",
+                        clueLevel > idx
+                          ? "border-primary bg-primary/10 text-foreground font-semibold"
+                          : "border-muted bg-card text-muted-foreground"
+                      )}
+                    >
+                      <span className="font-black text-primary mr-2">{idx + 1}.</span>
+                      {clueLevel > idx ? clue : "🔒"}
+                    </div>
+                  ))}
+                </div>
+                {clueLevel < (activeCell.question.clues?.length ?? 0) && (
+                  <button
+                    onClick={() => setClueLevel((c) => Math.min(c + 1, (activeCell.question.clues?.length ?? 0)))}
+                    className="mt-3 w-full rounded-lg bg-primary/20 px-3 py-2 text-sm font-black text-primary hover:bg-primary/30 sm:text-base"
+                  >
+                    الكشف عن تلميح (النقاط: {whoamiPointSteps[Math.min(clueLevel + 1, 2)]} بعده)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Beforeafter with two large choice buttons */}
+          {isBeforeAfter && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-beforeafter">
+              <div className="w-full max-w-md flex flex-col gap-3">
+                {(activeCell.question.choices || []).map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedChoices([choice])}
+                      className={cn(
+                        "rounded-2xl border-2 px-6 py-4 text-lg font-black sm:text-xl transition-all",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card border-card-border hover:border-primary"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
