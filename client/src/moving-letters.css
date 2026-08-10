@@ -13,8 +13,8 @@
 #root [data-testid="block-moving-letters"] > span {
   display: grid !important;
   place-items: center;
-  min-width: clamp(2.5rem, 9vw, 4.5rem);
-  min-height: clamp(2.5rem, 9vw, 4.5rem);
+  min-width: clamp(1.6rem, 6vw, 3rem);
+  min-height: clamp(1.6rem, 6vw, 3rem);
   padding: 0.15em 0.25em;
   line-height: 1;
   border-radius: 0.8rem;

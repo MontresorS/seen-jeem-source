@@ -109,7 +109,10 @@ export default function QuestionView() {
   const qhash = hashStr(activeCell.question.id);
   // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
   const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
-    const resolveCorrect = (team: 0 | 1) => {
+  // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
+  const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
+  const answering = state.teams[answeringTeamIdx];
+  const phoneOwnerName = state.teams[active.lifelines.phone ?? active.askingTeam].name;    const resolveCorrect = (team: 0 | 1) => {
         dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: isWadda7 ? effectivePoints : undefined });
       };
       const resolveNone = () => {
@@ -153,9 +156,9 @@ export default function QuestionView() {
   const shown = call !== null ? call : seconds;
   const label =
     call !== null
-      ? `مكالمة صديق — ${asking.name}`
+      ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
-        ? `دقيقة كاملة لـ${asking.name}`
+        ? `دقيقة كاملة لـ${answering.name}`
         : stage === "second"
           ? `١٠ ثواني لـ${other.name}`
           : "انتهى الوقت!";
@@ -171,9 +174,16 @@ export default function QuestionView() {
         >
           <ArrowRight className="ml-1 h-4 w-4" /> تخطي / رجوع للوحة
         </Button>
-        <span className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-xl">
-          الدور على: {asking.name}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-xl">
+            الدور على: {asking.name}
+          </span>
+          {active.trappedTo !== undefined && active.trappedTo !== null && (
+            <div className="rounded-full border-2 border-destructive/30 bg-destructive/5 px-3 py-1 text-xs font-bold text-destructive">
+              🪤 الفخ نقل السؤال إلى: {answering.name}
+            </div>
+          )}
+        </div>
       </div>
       <div className="sj-pop overflow-hidden rounded-3xl border-2 border-card-border bg-card sj-shadow-lg">
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
@@ -482,9 +492,15 @@ export default function QuestionView() {
               {usedLifelines.length === 0 ? (
                 <span className="text-xs text-muted-foreground 2xl:text-base">لم تُستخدم أي وسيلة</span>
               ) : (
-                usedLifelines.map((k) => (
-                  <LifelineChip key={k} meta={LIFELINE_BY_KEY[k]} used={true} compact />
-                ))
+                usedLifelines.map((k) => {
+                  const ownerIdx = active.lifelines[k]!;
+                  return (
+                    <div key={k} className="flex items-center gap-2">
+                      <LifelineChip meta={LIFELINE_BY_KEY[k]} used={true} compact />
+                      <span className="text-xs font-bold text-muted-foreground">{state.teams[ownerIdx].name}</span>
+                    </div>
+                  );
+                })
               )}
             </div>
            {!revealed && (
@@ -540,11 +556,11 @@ export default function QuestionView() {
                         {active.lifelines.trap !== undefined && (
                           <Button
                             data-testid="button-trap-wrong"
-                            onClick={() => resolveTrapWrong(active.askingTeam)}
+                            onClick={() => resolveTrapWrong(answeringTeamIdx)}
                             variant="destructive"
                             className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
                           >
-                            {state.teams[active.askingTeam].name} إجابة خاطئة (-{effectivePoints})
+                            {state.teams[answeringTeamIdx].name} إجابة خاطئة (-{effectivePoints})
                           </Button>
                         )}
                       </div>
