@@ -14,3 +14,11 @@ data.db-journal
 
 *.log
 .DS_Store
+
+# Local image-generation inputs and outputs
+artifacts/image-review/
+tmp/image-review/
+tmp/image-generation/
+source-images/
+client/public/images/generated/
+client/public/images/approved/

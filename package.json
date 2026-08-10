@@ -10,7 +10,11 @@
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "generate:reversed-candidates:neural": "node scripts/generate-reversed-candidates-elevenlabs.mjs",
-    "verify:reversed-candidates:neural": "node scripts/verify-reversed-candidates-neural.mjs"
+    "verify:reversed-candidates:neural": "node scripts/verify-reversed-candidates-neural.mjs",
+    "generate:image-questions": "node scripts/generate-image-questions.mjs",
+    "review:image-questions": "python3 -m http.server 4174 --directory artifacts/image-review",
+    "update:image-mapping": "node scripts/update-image-question-mapping.mjs",
+    "validate:image-questions": "node scripts/validate-image-question-mappings.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -72,6 +76,7 @@
     "react-icons": "^5.4.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.2",
+    "sharp": "^0.33.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "tw-animate-css": "^1.2.5",
