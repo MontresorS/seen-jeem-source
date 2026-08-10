@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { CATEGORIES, type Category, type Question } from "@/data/questions";
 
 export type TeamIndex = 0 | 1;
@@ -461,7 +461,7 @@ const GameContext = createContext<Ctx | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [hydrationComplete, setHydrationComplete] = React.useState(false);
+  const [hydrationComplete, setHydrationComplete] = useState(false);
   
   // Load usedIds from localStorage on mount (hydration phase)
   useEffect(() => {
