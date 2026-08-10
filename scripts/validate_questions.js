@@ -95,34 +95,33 @@ function validateMoving() {
   }
   return errors;
 }
-
-+function validateTrueFalse() {
-+  const block = extractCategory('truefalse');
-+  if (!block) { console.log('No truefalse category found'); return 1; }
-+  const objRe = /\{([\s\S]*?)\}/g;
-+  let m; let qs = [];
-+  while ((m = objRe.exec(block))) {
-+    const t = m[1];
-+    const id = (t.match(/id:\s*"([^"]+)"/) || [])[1];
-+    const points = parseInt((t.match(/points:\s*(\d+)/) || [])[1] || '0', 10);
-+    const choicesMatch = t.match(/choices:\s*\[((?:.|\n)*?)\]/);
-+    const correctMatch = t.match(/correctChoices:\s*\[((?:.|\n)*?)\]/);
-+    const choices = choicesMatch ? choicesMatch[1].split(',').map(s=>s.replace(/['"\s]/g,'')).filter(Boolean) : [];
-+    const correct = correctMatch ? correctMatch[1].split(',').map(s=>s.replace(/['"\s]/g,'')).filter(Boolean) : [];
-+    qs.push({ id, points, choices, correct });
-+  }
-+  let errors = 0;
-+  if (qs.length !== 50) { console.error('TRUEFALSE count != 50:', qs.length); errors++; }
-+  const counts = {200:0,400:0,600:0};
-+  for (const q of qs) {
-+    if (![200,400,600].includes(q.points)) { console.error('TRUEFALSE invalid points:', q.id, q.points); errors++; }
-+    counts[q.points] = (counts[q.points] || 0) + 1;
-+    if (q.choices.length !== 2 || q.choices[0] !== 'صح' || q.choices[1] !== 'فخ') { console.error('TRUEFALSE choices invalid for', q.id, q.choices); errors++; }
-+    if (q.correct.length !== 1) { console.error('TRUEFALSE must have exactly one correctChoice for', q.id, q.correct); errors++; }
-+  }
-+  if (counts[200] !== 17 || counts[400] !== 17 || counts[600] !== 16) { console.error('TRUEFALSE distribution wrong:', counts); errors++; }
-+  return errors;
-+}
+function validateTrueFalse() {
+  const block = extractCategory('truefalse');
+  if (!block) { console.log('No truefalse category found'); return 1; }
+  const objRe = /\{([\s\S]*?)\}/g;
+  let m; let qs = [];
+  while ((m = objRe.exec(block))) {
+    const t = m[1];
+    const id = (t.match(/id:\s*"([^"]+)"/) || [])[1];
+    const points = parseInt((t.match(/points:\s*(\d+)/) || [])[1] || '0', 10);
+    const choicesMatch = t.match(/choices:\s*\[((?:.|\n)*?)\]/);
+    const correctMatch = t.match(/correctChoices:\s*\[((?:.|\n)*?)\]/);
+    const choices = choicesMatch ? choicesMatch[1].split(',').map(s=>s.replace(/['"\s]/g,'')).filter(Boolean) : [];
+    const correct = correctMatch ? correctMatch[1].split(',').map(s=>s.replace(/['"\s]/g,'')).filter(Boolean) : [];
+    qs.push({ id, points, choices, correct });
+  }
+  let errors = 0;
+  if (qs.length !== 50) { console.error('TRUEFALSE count != 50:', qs.length); errors++; }
+  const counts = {200:0,400:0,600:0};
+  for (const q of qs) {
+    if (![200,400,600].includes(q.points)) { console.error('TRUEFALSE invalid points:', q.id, q.points); errors++; }
+    counts[q.points] = (counts[q.points] || 0) + 1;
+    if (q.choices.length !== 2 || q.choices[0] !== 'صح' || q.choices[1] !== 'فخ') { console.error('TRUEFALSE choices invalid for', q.id, q.choices); errors++; }
+    if (q.correct.length !== 1) { console.error('TRUEFALSE must have exactly one correctChoice for', q.id, q.correct); errors++; }
+  }
+  if (counts[200] !== 17 || counts[400] !== 17 || counts[600] !== 16) { console.error('TRUEFALSE distribution wrong:', counts); errors++; }
+  return errors;
+}
 
 
 function run() {

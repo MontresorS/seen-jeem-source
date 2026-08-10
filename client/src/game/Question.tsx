@@ -54,7 +54,7 @@ export default function QuestionView() {
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
-  }, [activeCell.question.id, active?.id]);
+  }, [active?.cellId]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
     stageRef.current = stage;
