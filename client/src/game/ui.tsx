@@ -16,48 +16,18 @@ import { cn } from "@/lib/utils";
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <svg
-        viewBox="0 0 64 64"
-        aria-label="شعار سين وجيم"
-        role="img"
+      <img
+        src="/seen-jeem-logo.jpg"
+        alt="شعار سين وجيم — نسخة منتصر المحسنة"
+        style={{ objectFit: "contain" }}
         className="h-10 w-10 shrink-0 sm:h-12 sm:w-12"
-        fill="none"
-      >
-        <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="hsl(var(--navy))" />
-        <circle cx="32" cy="32" r="21" stroke="hsl(var(--primary))" strokeWidth="4.5" />
-        {/* س */}
-        <path
-          d="M15 27v5m4-5v5m4-5v5m-8 0h12"
-          stroke="hsl(var(--accent))"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        {/* ؟ */}
-        <path
-          d="M31 22c4 0 6.5 2.4 6.5 5.4 0 3.4-4 4.1-5 6.2-.3.7-.4 1.4-.4 2.2"
-          stroke="hsl(var(--primary))"
-          strokeWidth="3.4"
-          strokeLinecap="round"
-        />
-        <circle cx="32" cy="42" r="2.3" fill="hsl(var(--primary))" />
-        {/* ج */}
-        <path
-          d="M43 27c3.6 0 5.4 1.6 5.4 4 0 2.8-2.4 4.6-5.6 4.6"
-          stroke="hsl(var(--accent))"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle cx="46" cy="40" r="1.9" fill="hsl(var(--accent))" />
-      </svg>
+      />
       <span className="flex flex-col leading-none">
         <span className="text-xl font-extrabold tracking-tight sm:text-2xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
         <span className="text-[10px] font-semibold text-muted-foreground sm:text-xs">
           Montaser's Cool Edition
-        </span>
-        <span className="mt-1 text-[10px] font-semibold text-muted-foreground sm:text-xs">
-          نسخة منتصر المحسنة
         </span>
       </span>
     </span>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
 import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
+import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
 const MAIN = 60;
@@ -141,6 +142,8 @@ export default function QuestionView() {
   const isBeforeAfter = catKey === "beforeafter";
   const isClosestNumber = catKey === "closestnumber";
   const isAudienceChoice = catKey === "audiencechoice";
+  const isSilentFilms = catKey === "silentfilms";
+  const isDrawGuess = catKey === "drawguess";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
   // whoami scoring: first clue free, then deductions
@@ -197,7 +200,13 @@ export default function QuestionView() {
     }
   };
 
-  const total = call !== null ? CALL : stage === "main" ? MAIN : SECOND;
+  const total = call !== null 
+    ? CALL 
+    : isSilentFilms
+      ? (activeCell.points === 600 ? 60 : 90)
+      : isDrawGuess 
+        ? 60
+        : stage === "main" ? MAIN : SECOND;
   const shown = call !== null ? call : seconds;
   const label =
     call !== null
@@ -302,7 +311,41 @@ export default function QuestionView() {
                 {reversedText}
               </p>
             </div>
-          ) : isMoving ? null : (
+          ) : isMoving ? null : isSilentFilms ? (
+            <div className="mt-4 flex flex-col items-center gap-4">
+              <QRDisplay
+                payload={activeCell.question.a}
+                size={288}
+                instruction="امسح الرمز بالهاتف لمعرفة اسم الفيلم — ممنوع الكلام"
+              />
+              {revealed && (
+                <p
+                  dir="rtl"
+                  className="text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl"
+                  style={{ color: QUESTION_TEXT_COLOR }}
+                >
+                  {activeCell.question.a}
+                </p>
+              )}
+            </div>
+          ) : isDrawGuess ? (
+            <div className="mt-4 flex flex-col items-center gap-4">
+              <QRDisplay
+                payload={activeCell.question.a}
+                size={288}
+                instruction="امسح الرمز بالهاتف لمعرفة ما سترسمه"
+              />
+              {revealed && (
+                <p
+                  dir="rtl"
+                  className="text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl"
+                  style={{ color: QUESTION_TEXT_COLOR }}
+                >
+                  {activeCell.question.a}
+                </p>
+              )}
+            </div>
+          ) : (
             <p
               data-testid="text-question"
               dir="rtl"

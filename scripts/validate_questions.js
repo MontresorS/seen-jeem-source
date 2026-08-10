@@ -165,6 +165,48 @@ function validateOrdering() {
 }
 
 
+function validateSilentFilms() {
+  const block = extractCategory('silentfilms');
+  if (!block) { console.log('No silentfilms category found'); return 0; }
+  const qs = extractQuestions(block);
+  let errors = 0;
+  if (qs.length !== 50) { console.error('SILENTFILMS: expected 50 questions, got', qs.length); errors++; }
+  const dist = { 200: 0, 400: 0, 600: 0 };
+  const ids = new Set();
+  for (const q of qs) {
+    if (!q.a || q.a.trim() === '') { console.error('SILENTFILMS empty answer:', q.id); errors++; }
+    if (!q.id || !q.id.startsWith('silentfilms-')) { console.error('SILENTFILMS invalid ID:', q.id); errors++; }
+    if (ids.has(q.id)) { console.error('SILENTFILMS duplicate ID:', q.id); errors++; }
+    ids.add(q.id);
+    if (dist[q.points] !== undefined) dist[q.points]++;
+  }
+  if (dist[200] !== 17) { console.error('SILENTFILMS 200-point: expected 17, got', dist[200]); errors++; }
+  if (dist[400] !== 17) { console.error('SILENTFILMS 400-point: expected 17, got', dist[400]); errors++; }
+  if (dist[600] !== 16) { console.error('SILENTFILMS 600-point: expected 16, got', dist[600]); errors++; }
+  return errors;
+}
+
+function validateDrawGuess() {
+  const block = extractCategory('drawguess');
+  if (!block) { console.log('No drawguess category found'); return 0; }
+  const qs = extractQuestions(block);
+  let errors = 0;
+  if (qs.length !== 50) { console.error('DRAWGUESS: expected 50 questions, got', qs.length); errors++; }
+  const dist = { 200: 0, 400: 0, 600: 0 };
+  const ids = new Set();
+  for (const q of qs) {
+    if (!q.a || q.a.trim() === '') { console.error('DRAWGUESS empty prompt:', q.id); errors++; }
+    if (!q.id || !q.id.startsWith('drawguess-')) { console.error('DRAWGUESS invalid ID:', q.id); errors++; }
+    if (ids.has(q.id)) { console.error('DRAWGUESS duplicate ID:', q.id); errors++; }
+    ids.add(q.id);
+    if (dist[q.points] !== undefined) dist[q.points]++;
+  }
+  if (dist[200] !== 17) { console.error('DRAWGUESS 200-point: expected 17, got', dist[200]); errors++; }
+  if (dist[400] !== 17) { console.error('DRAWGUESS 400-point: expected 17, got', dist[400]); errors++; }
+  if (dist[600] !== 16) { console.error('DRAWGUESS 600-point: expected 16, got', dist[600]); errors++; }
+  return errors;
+}
+
 function run() {
   console.log('Validating reversed and moving categories...');
   let errs = 0;
@@ -172,6 +214,8 @@ function run() {
   errs += validateReversed();
   errs += validateMoving();
   errs += validateOrdering();
+  errs += validateSilentFilms();
+  errs += validateDrawGuess();
   if (errs === 0) console.log('Validation passed');
   else console.error('Validation found', errs, 'issues');
   process.exit(errs>0?1:0);
