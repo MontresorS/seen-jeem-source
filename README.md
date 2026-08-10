@@ -63,3 +63,61 @@ npm run validate:image-questions
 ```
 
 This fails if an approved mapping references a nonexistent question ID or a missing source image.
+
+## AI image-question workflow (separate, offline)
+
+This workflow uses the OpenAI Images API via OPENAI_API_KEY from the environment only. It never writes to client/src/data/questions.ts or client/public/images/ until an explicit promotion step is run.
+
+### Setup
+
+```bash
+export OPENAI_API_KEY=...
+```
+
+### Dry run
+
+```bash
+npm run generate:ai-image-questions -- --dry-run
+npm run verify:ai-image-questions -- --dry-run
+```
+
+### Generate new AI image-question assets
+
+```bash
+npm run generate:ai-image-questions
+```
+
+This uses the seed list in scripts/ai-image-question-seeds.json, writes generated source images and review outputs under ignored local folders, creates pending-review mappings only, and never auto-approves or copies final assets to client/public/images/.
+
+### Verify generated images
+
+```bash
+npm run verify:ai-image-questions
+```
+
+This uses a vision-capable OpenAI call to inspect each generated source image and produce structured verification metadata under artifacts/image-review/.
+
+### Open the review report
+
+```bash
+npm run review:image-questions
+```
+
+Then open:
+
+- http://127.0.0.1:4174/ai-image-review.html
+
+### Promote approved assets
+
+```bash
+npm run promote:ai-image-questions
+```
+
+This promotes only approved mappings, adds the exact ten question records to client/src/data/questions.ts, copies approved assets into client/public/images/, runs validation, and prints a Git diff. It never auto-commits or auto-pushes.
+
+### Build and validate
+
+```bash
+npm run build
+npm run validate:image-questions
+```

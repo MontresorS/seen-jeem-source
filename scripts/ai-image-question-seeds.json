@@ -1,0 +1,82 @@
+[
+  {
+    "questionId": "zoom-16",
+    "mode": "zoom",
+    "prompt": "إيه الحاجة اللي معمول لها زوم؟",
+    "answer": "مفتاح",
+    "points": 200,
+    "imagePrompt": "A single realistic house key on a plain neutral background, metal texture, clear teeth and bow, no text, no logo, no watermark, bright daylight, clean composition, high detail, easy to identify."
+  },
+  {
+    "questionId": "zoom-17",
+    "mode": "zoom",
+    "prompt": "إيه الحاجة اللي معمول لها زوم؟",
+    "answer": "مكواة",
+    "points": 200,
+    "imagePrompt": "A realistic steam iron standing upright on a plain surface, visible handle and soleplate, no brand marking, no text, no watermark, clean photo, natural lighting, high detail."
+  },
+  {
+    "questionId": "zoom-18",
+    "mode": "zoom",
+    "prompt": "إيه الحاجة اللي معمول لها زوم؟",
+    "answer": "شمعة",
+    "points": 400,
+    "imagePrompt": "A single candle standing upright on a simple background, visible wax body and wick, no text, no logo, no watermark, realistic and clean, bright lighting, easy to identify."
+  },
+  {
+    "questionId": "zoom-19",
+    "mode": "zoom",
+    "prompt": "إيه الحاجة اللي معمول لها زوم؟",
+    "answer": "مروحة كهربائية",
+    "points": 400,
+    "imagePrompt": "A portable electric desk fan photographed from the front on a plain background, visible blades and stand, clean composition, no branding, no text, no watermark, realistic lighting."
+  },
+  {
+    "questionId": "zoom-20",
+    "mode": "zoom",
+    "prompt": "إيه الحاجة اللي معمول لها زوم؟",
+    "answer": "دجاجة",
+    "points": 600,
+    "imagePrompt": "A single chicken standing on the ground in a clear outdoor setting, visible body shape and head, no text, no logo, no watermark, realistic, natural lighting, easy to identify."
+  },
+  {
+    "questionId": "wadda7-51",
+    "mode": "wadda7",
+    "prompt": "إيه اللي في الصورة؟",
+    "answer": "قطة",
+    "points": 200,
+    "imagePrompt": "A single cat sitting on a plain surface, clear full face, ears, and tail, no text, no logo, no watermark, realistic photo, natural lighting, simple composition."
+  },
+  {
+    "questionId": "wadda7-52",
+    "mode": "wadda7",
+    "prompt": "إيه اللي في الصورة؟",
+    "answer": "ملعقة",
+    "points": 200,
+    "imagePrompt": "A single spoon placed on a plain background, clearly visible bowl and handle, no text, no logo, no watermark, realistic, clean lighting, easy to identify."
+  },
+  {
+    "questionId": "wadda7-53",
+    "mode": "wadda7",
+    "prompt": "إيه اللي في الصورة؟",
+    "answer": "حذاء",
+    "points": 400,
+    "imagePrompt": "A single shoe photographed from the front or side on a plain surface, visible sole, upper, and laces, no text, no logo, no watermark, realistic, clean composition."
+  },
+  {
+    "questionId": "wadda7-54",
+    "mode": "wadda7",
+    "prompt": "إيه اللي في الصورة؟",
+    "answer": "موز",
+    "points": 400,
+    "imagePrompt": "A single banana on a plain background, curved shape and peel clearly visible, no text, no logo, no watermark, realistic photo, soft daylight."
+  },
+  {
+    "questionId": "wadda7-55",
+    "mode": "wadda7",
+    "prompt": "إيه اللي في الصورة؟",
+    "answer": "فراشة",
+    "points": 600,
+    "imagePrompt": "A butterfly with open wings photographed against a simple background, clear body and wing patterns, no text, no logo, no watermark, realistic photography, high detail."
+  }
+]
