@@ -9,6 +9,10 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "generate:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts generate",
+    "review:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts review",
+    "validate:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts validate",
+    "apply:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts apply",
     "generate:reversed-candidates:neural": "node scripts/generate-reversed-candidates-elevenlabs.mjs",
     "verify:reversed-candidates:neural": "node scripts/verify-reversed-candidates-neural.mjs"
   },
@@ -98,6 +102,7 @@
     "drizzle-kit": "^0.31.8",
     "esbuild": "^0.25.0",
     "postcss": "^8.4.47",
+    "sharp": "^0.35.3",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
     "typescript": "5.6.3",

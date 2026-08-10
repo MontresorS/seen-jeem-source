@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "source": "input/images/example-zoom.jpg",
+      "category": "zoom",
+      "questionId": "zoom-1",
+      "outputName": "example-zoom",
+      "reviewNotes": "Optional note shown in the gallery",
+      "zoom": {
+        "manualCrop": {
+          "left": 120,
+          "top": 80,
+          "width": 900,
+          "height": 900
+        }
+      }
+    },
+    {
+      "source": "input/images/example-wadda7.jpg",
+      "category": "wadda7",
+      "questionId": "wadda7-20",
+      "outputName": "example-wadda7"
+    }
+  ]
+}
