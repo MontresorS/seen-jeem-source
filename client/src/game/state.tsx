@@ -255,7 +255,8 @@ type Action =
   | { type: "END" }
   | { type: "RESET" }
   | { type: "RESET_USED" }
-  | { type: "LOAD_USED_IDS"; usedIds: string[] };
+  | { type: "LOAD_USED_IDS"; usedIds: string[] }
+  | { type: "RESTORE_GAME"; state: GameState };
 
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
@@ -271,6 +272,12 @@ function reducer(state: GameState, action: Action): GameState {
       const recycledIds = cells.filter((c) => c.recycled).map((c) => c.question.id);
       // recycled ids move to the end of the queue so they become "newest used"
       const usedIds = [...state.usedIds.filter((id) => !recycledIds.includes(id)), ...freshIds, ...recycledIds];
+      // Clear snapshot when starting a new game
+      try {
+        localStorage.removeItem("seen-jeem-active-game-v1");
+      } catch {
+        // Silently ignore
+      }
       return {
         ...initialState,
         phase: "board",
@@ -413,6 +420,12 @@ function reducer(state: GameState, action: Action): GameState {
     case "SET_TURN":
       return { ...state, turn: action.team };
     case "END":
+      // Clear snapshot when ending game
+      try {
+        localStorage.removeItem("seen-jeem-active-game-v1");
+      } catch {
+        // Silently ignore
+      }
       return { ...state, phase: "results", active: null, charades: null };
     case "RESET":
       // «العب مرة ثانية» — نحتفظ بذاكرة الأسئلة المستخدمة داخل الجلسة
@@ -421,6 +434,8 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...state, usedIds: [], recycledOnBoard: false };
     case "LOAD_USED_IDS":
       return { ...state, usedIds: action.usedIds };
+    case "RESTORE_GAME":
+      return action.state;
     default:
       return state;
   }
@@ -471,6 +486,65 @@ export function GameProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("seen-jeem-used-question-ids-v1", JSON.stringify(state.usedIds));
     }
   }, [state.usedIds, hydrationComplete]);
+
+  // Save game snapshot on state changes (for AirPlay/mobile resume)
+  useEffect(() => {
+    // Only save if we're actively in a game (not setup/results)
+    if (hydrationComplete && state.phase !== "setup" && state.phase !== "results") {
+      try {
+        const snapshot = {
+          version: 1,
+          phase: state.phase,
+          gameName: state.gameName,
+          teams: state.teams,
+          turn: state.turn,
+          catKeys: state.catKeys,
+          cells: state.cells,
+          active: state.active,
+          pendingHole: state.pendingHole,
+          history: state.history,
+          charades: state.charades,
+          usedIds: state.usedIds,
+          recycledOnBoard: state.recycledOnBoard,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));
+      } catch {
+        // Silently ignore if too large or other errors
+      }
+    }
+  }, [state, hydrationComplete]);
+
+  // Save snapshot on visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && state.phase !== "setup" && state.phase !== "results") {
+        try {
+          const snapshot = {
+            version: 1,
+            phase: state.phase,
+            gameName: state.gameName,
+            teams: state.teams,
+            turn: state.turn,
+            catKeys: state.catKeys,
+            cells: state.cells,
+            active: state.active,
+            pendingHole: state.pendingHole,
+            history: state.history,
+            charades: state.charades,
+            usedIds: state.usedIds,
+            recycledOnBoard: state.recycledOnBoard,
+            timestamp: Date.now(),
+          };
+          localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));
+        } catch {
+          // Silently ignore if error
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [state]);
 
   const value = useMemo<Ctx>(() => {
     const activeCell = state.active
