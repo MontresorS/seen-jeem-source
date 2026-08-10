@@ -51,6 +51,10 @@ export default function QuestionView() {
   const [playing, setPlaying] = useState(false);
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
     const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+  // reset per-question selections when active question changes
+  useEffect(() => {
+    setSelectedChoices([]);
+  }, [activeCell.question.id, active?.id]);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const stageRef = useRef(stage);
     stageRef.current = stage;
@@ -272,12 +276,35 @@ export default function QuestionView() {
           )}
 
           {/* MCQ choices rendering */}
-          {Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
+          {catKey === 'truefalse' ? (
+            <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-truefalse">
+              <p className="text-center text-lg font-extrabold" style={{ color: QUESTION_TEXT_COLOR }}>اختر: صح أم فخ؟</p>
+              <div className="flex w-full max-w-md justify-center gap-4">
+                {(activeCell.question.choices || ["صح", "فخ"]).slice(0,2).map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedChoices([choice])}
+                      className={cn(
+                        "flex-1 rounded-2xl border-2 px-6 py-4 text-xl font-black sm:text-2xl",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-sm text-muted-foreground">التحديد يعرض فقط؛ اختر النتيجة النهائية بعد كشف الإجابة.</div>
+            </div>
+          ) : Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-choices">
               <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
                 {activeCell.question.choices.map((choice, idx) => {
                   const selected = selectedChoices.includes(choice);
-                  const maxAllowed = active.lifelines.double === active.askingTeam ? 2 : 1;
+                  const maxAllowed = (active.lifelines.double === active.askingTeam && catKey !== 'truefalse' && catKey !== 'beforeafter' && catKey !== 'audiencechoice') ? 2 : 1;
                   return (
                     <button
                       key={idx}
@@ -514,7 +541,7 @@ export default function QuestionView() {
           state.teams[active.askingTeam].used[l.key] ||
           active.lifelines[l.key] !== undefined ||
           (l.key === "phone" && call !== null) ||
-          (l.key === "double" && (!activeCell.question.choices || activeCell.question.choices.length === 0))
+          (l.key === "double" && (!activeCell.question.choices || activeCell.question.choices.length === 0 || activeCell.catKey === 'truefalse' || activeCell.catKey === 'beforeafter'))
         }
         onClick={() => {
           if (l.key === "phone") setCall(CALL);
