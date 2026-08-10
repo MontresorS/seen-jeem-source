@@ -143,9 +143,14 @@ export default function QuestionView() {
   const isAudienceChoice = catKey === "audiencechoice";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
-  // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
-  const whoamiPointSteps = [600, 400, 200] as const;
-  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : (isWhoami ? whoamiPointSteps[Math.min(clueLevel, 2)] : activeCell.points);
+  // whoami scoring: first clue free, then deductions
+  const whoamiPointSteps = (originalPoints: number): readonly number[] => {
+    if (originalPoints === 600) return [600, 600, 400, 200] as const;
+    if (originalPoints === 400) return [400, 400, 200, 200] as const;
+    return [200, 200, 200, 200] as const;
+  };
+  const whoamiSteps = whoamiPointSteps(activeCell.points);
+  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : (isWhoami ? whoamiSteps[Math.min(clueLevel, 3)] : activeCell.points);
   // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
   const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
   const answering = state.teams[answeringTeamIdx];
@@ -165,6 +170,8 @@ export default function QuestionView() {
   const movingLetters = isMoving
     ? movingWords.flatMap((w, wi) => w.split("").map((ch) => ({ ch, wi })))
     : [];
+  
+  const reversedText = isReversed ? activeCell.question.a.split("").reverse().join("") : "";
 
   const playAudio = () => {
     if (plays >= MAX_AUDIO_PLAYS || playing) return;
@@ -291,7 +298,7 @@ export default function QuestionView() {
                 className="break-words text-center text-xl font-extrabold leading-relaxed sm:text-2xl 2xl:text-4xl"
                 style={{ color: QUESTION_TEXT_COLOR }}
               >
-                {activeCell.question.q}
+                {reversedText}
               </p>
             </div>
           ) : isMoving ? null : (
@@ -337,7 +344,7 @@ export default function QuestionView() {
               <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
                 {activeCell.question.choices.map((choice, idx) => {
                   const selected = selectedChoices.includes(choice);
-                  const maxAllowed = (active.lifelines.double === active.askingTeam && catKey !== 'truefalse' && catKey !== 'beforeafter' && catKey !== 'audiencechoice') ? 2 : 1;
+                  const maxAllowed = active.lifelines.double === active.askingTeam ? 2 : 1;
                   return (
                     <button
                       key={idx}
@@ -479,7 +486,19 @@ export default function QuestionView() {
           {/* Audiencechoice with percentage bars */}
           {isAudienceChoice && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-audiencechoice">
-              {activeCell.question.audiencePercentages && (
+              {!revealed && activeCell.question.choices && (
+                <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                  <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm">الاختيارات:</p>
+                  <div className="space-y-2">
+                    {activeCell.question.choices.map((choice, idx) => (
+                      <div key={idx} className="rounded-lg border-2 border-primary/40 bg-card px-4 py-2 text-center font-bold text-primary">
+                        {choice}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {revealed && activeCell.question.audiencePercentages && (
                 <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
                   <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm">نسب الاختيار:</p>
                   <div className="space-y-2">
@@ -827,8 +846,7 @@ export default function QuestionView() {
         disabled={
           state.teams[active.askingTeam].used[l.key] ||
           active.lifelines[l.key] !== undefined ||
-          (l.key === "phone" && call !== null) ||
-          (l.key === "double" && (!activeCell.question.choices || activeCell.question.choices.length === 0 || activeCell.catKey === 'truefalse' || activeCell.catKey === 'beforeafter'))
+          (l.key === "phone" && call !== null)
         }
         onClick={() => {
           if (l.key === "phone") setCall(CALL);

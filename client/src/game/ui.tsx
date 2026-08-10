@@ -50,11 +50,14 @@ export function Logo({ className }: { className?: string }) {
         <circle cx="46" cy="40" r="1.9" fill="hsl(var(--accent))" />
       </svg>
       <span className="flex flex-col leading-none">
-        <span className="text-xl font-extrabold tracking-tight text-secondary dark:text-foreground sm:text-2xl">
+        <span className="text-xl font-extrabold tracking-tight sm:text-2xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
-        <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground sm:text-xs">
-          سؤال وجواب مع أصحابك
+        <span className="text-[10px] font-semibold text-muted-foreground sm:text-xs">
+          Montaser's Cool Edition
+        </span>
+        <span className="mt-1 text-[10px] font-semibold text-muted-foreground sm:text-xs">
+          نسخة منتصر المحسنة
         </span>
       </span>
     </span>

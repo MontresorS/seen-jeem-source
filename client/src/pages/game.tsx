@@ -69,7 +69,7 @@ export default function GamePage() {
         {state.phase === "results" && <Results />}
         {showFooter && (
           <footer className="pb-6 text-center text-[11px] font-semibold text-muted-foreground 2xl:text-base">
-            مستوحاة من لعبة سين وجيم — العبوها مع أصحابكم 🎯
+            نسخة منتصر المحسنة
           </footer>
         )}
       </main>
