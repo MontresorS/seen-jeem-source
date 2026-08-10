@@ -3,7 +3,6 @@ import { useGame } from "@/game/state";
 import Setup from "@/game/Setup";
 import Board from "@/game/Board";
 import QuestionView from "@/game/Question";
-import Charades from "@/game/Charades";
 import Results from "@/game/Results";
 import {
   AlertDialog,
@@ -65,7 +64,6 @@ export default function GamePage() {
         {state.phase === "setup" && <Setup />}
         {state.phase === "board" && <Board />}
         {state.phase === "question" && <QuestionView />}
-        {state.phase === "charades" && <Charades />}
         {state.phase === "results" && <Results />}
         {showFooter && (
           <footer className="pb-6 text-center text-[11px] font-semibold text-muted-foreground 2xl:text-base">

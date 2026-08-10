@@ -20,13 +20,13 @@ export function Logo({ className }: { className?: string }) {
         src="/seen-jeem-logo.jpg"
         alt="شعار سين وجيم — نسخة منتصر المحسنة"
         style={{ objectFit: "contain" }}
-        className="h-10 w-10 shrink-0 sm:h-12 sm:w-12"
+        className="h-16 w-16 shrink-0 rounded-xl border-2 border-primary/20 bg-white/80 p-1 shadow-lg sm:h-24 sm:w-24 lg:h-28 lg:w-28"
       />
       <span className="flex flex-col leading-none">
-        <span className="text-xl font-extrabold tracking-tight sm:text-2xl" style={{ color: "#3E2723" }}>
+        <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
-        <span className="text-[10px] font-semibold text-muted-foreground sm:text-xs">
+        <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
           Montaser's Cool Edition
         </span>
       </span>
@@ -161,15 +161,6 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="rounded-xl border-2 border-accent/50 bg-accent/20 p-3">
-            <p className="font-extrabold text-secondary dark:text-foreground">🎬 فقرة «بدون كلام»</p>
-            <p className="mt-1">
-              الفريق الخصم يختار اسم فيلم أو مسلسل، والفريق اللي عليه الدور يمثّله{" "}
-              <b>بدون كلام</b> في <b>٦٠ ثانية</b>. النقاط ثابتة <b>٦٠٠ نقطة</b>، ومتاحة{" "}
-              <b>مرتين لكل فريق</b> في اللعبة.
-            </p>
           </div>
 
           <div className="rounded-xl border-2 border-sky-500/50 bg-sky-500/10 p-3">

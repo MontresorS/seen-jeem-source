@@ -5,10 +5,6 @@ export type TeamIndex = 0 | 1;
 export type Points = 200 | 400 | 600;
 export type LifelineKey = "phone" | "hole" | "double" | "trap" | "rest";
 
-export const CHARADES_POINTS = 600;
-export const CHARADES_MAX_USES = 2;
-export const CHARADES_SECONDS = 60;
-
 export interface LifelineMeta {
   key: LifelineKey;
   name: string;
@@ -72,7 +68,6 @@ export interface Team {
   name: string;
   score: number;
   used: Record<LifelineKey, boolean>;
-  charadesUsed: number;
 }
 
 export interface Cell {
@@ -94,13 +89,8 @@ export interface ActiveQuestion {
   lifelines: Partial<Record<LifelineKey, TeamIndex>>;
 }
 
-export interface CharadesRound {
-  team: TeamIndex;
-  movie: string;
-}
-
 export interface GameState {
-  phase: "setup" | "board" | "question" | "charades" | "results";
+  phase: "setup" | "board" | "question" | "results";
   gameName: string;
   teams: [Team, Team];
   turn: TeamIndex;
@@ -109,7 +99,6 @@ export interface GameState {
   active: ActiveQuestion | null;
   pendingHole: TeamIndex | null;
   history: { question: Question; winner: TeamIndex | null; points: number }[];
-  charades: CharadesRound | null;
   /** أسئلة استُخدمت في هذه الجلسة (تبقى بعد «العب مرة ثانية») — الأقدم أولاً */
   usedIds: string[];
   /** true إذا اضطررنا لإعادة استخدام أسئلة قديمة في اللوحة الحالية */
@@ -124,7 +113,6 @@ const freshTeam = (name: string): Team => ({
   name,
   score: 0,
   used: { phone: false, hole: false, double: false, trap: false, rest: false },
-  charadesUsed: 0,
 });
 
 const initialState: GameState = {
@@ -137,7 +125,6 @@ const initialState: GameState = {
   active: null,
   pendingHole: null,
   history: [],
-  charades: null,
   usedIds: [],
   recycledOnBoard: false,
 };
@@ -252,10 +239,6 @@ type Action =
   | { type: "RESOLVE"; outcome: Outcome; pointsOverride?: number }
   | { type: "ADJUST"; team: TeamIndex; delta: number }
   | { type: "SET_TURN"; team: TeamIndex }
-  | { type: "OPEN_CHARADES" }
-  | { type: "SET_CHARADES_MOVIE"; movie: string }
-  | { type: "CANCEL_CHARADES" }
-  | { type: "RESOLVE_CHARADES"; guessed: boolean }
   | { type: "END" }
   | { type: "RESET" }
   | { type: "RESET_USED" }
@@ -382,38 +365,6 @@ function reducer(state: GameState, action: Action): GameState {
               history: [...state.history, { question: cell.question, winner, points: action.outcome.kind === "trap-wrong" ? -pts : pts }],
       };
     }
-    case "OPEN_CHARADES": {
-      if (state.teams[state.turn].charadesUsed >= CHARADES_MAX_USES) return state;
-      return {
-        ...state,
-        phase: "charades",
-        pendingHole: null,
-        charades: { team: state.turn, movie: "" },
-      };
-    }
-    case "SET_CHARADES_MOVIE":
-      return state.charades
-        ? { ...state, charades: { ...state.charades, movie: action.movie } }
-        : state;
-    case "CANCEL_CHARADES":
-      return { ...state, phase: "board", charades: null };
-    case "RESOLVE_CHARADES": {
-      if (!state.charades) return state;
-      const team = state.charades.team;
-      const teams = [state.teams[0], state.teams[1]] as [Team, Team];
-      teams[team] = {
-        ...teams[team],
-        charadesUsed: teams[team].charadesUsed + 1,
-        score: teams[team].score + (action.guessed ? CHARADES_POINTS : 0),
-      };
-      return {
-        ...state,
-        teams,
-        charades: null,
-        phase: "board",
-        turn: team === 0 ? 1 : 0,
-      };
-    }
     case "ADJUST": {
       const teams = [state.teams[0], state.teams[1]] as [Team, Team];
       teams[action.team] = {
@@ -431,7 +382,7 @@ function reducer(state: GameState, action: Action): GameState {
       } catch {
         // Silently ignore
       }
-      return { ...state, phase: "results", active: null, charades: null };
+      return { ...state, phase: "results", active: null };
     case "RESET":
       // «العب مرة ثانية» — نحتفظ بذاكرة الأسئلة المستخدمة داخل الجلسة
       return { ...initialState, usedIds: state.usedIds };
@@ -510,7 +461,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
           active: state.active,
           pendingHole: state.pendingHole,
           history: state.history,
-          charades: state.charades,
           usedIds: state.usedIds,
           recycledOnBoard: state.recycledOnBoard,
           timerEndTimestamp: state.timerEndTimestamp,
@@ -540,7 +490,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
             active: state.active,
             pendingHole: state.pendingHole,
             history: state.history,
-            charades: state.charades,
             usedIds: state.usedIds,
             recycledOnBoard: state.recycledOnBoard,
             timerEndTimestamp: state.timerEndTimestamp,
