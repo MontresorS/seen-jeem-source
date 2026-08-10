@@ -1,13 +1,9 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { CATEGORIES, type Category, type Question } from "@/data/questions";
 
 export type TeamIndex = 0 | 1;
 export type Points = 200 | 400 | 600;
 export type LifelineKey = "phone" | "hole" | "double" | "trap" | "rest";
-
-export const CHARADES_POINTS = 600;
-export const CHARADES_MAX_USES = 2;
-export const CHARADES_SECONDS = 60;
 
 export interface LifelineMeta {
   key: LifelineKey;
@@ -72,7 +68,6 @@ export interface Team {
   name: string;
   score: number;
   used: Record<LifelineKey, boolean>;
-  charadesUsed: number;
 }
 
 export interface Cell {
@@ -88,17 +83,14 @@ export interface Cell {
 export interface ActiveQuestion {
   cellId: string;
   askingTeam: TeamIndex;
+  /** If a trap was used, the answering opportunity is transferred here. Keep askingTeam as the original owner. */
+  trappedTo?: TeamIndex | null;
   hole: boolean;
   lifelines: Partial<Record<LifelineKey, TeamIndex>>;
 }
 
-export interface CharadesRound {
-  team: TeamIndex;
-  movie: string;
-}
-
 export interface GameState {
-  phase: "setup" | "board" | "question" | "charades" | "results";
+  phase: "setup" | "board" | "question" | "results";
   gameName: string;
   teams: [Team, Team];
   turn: TeamIndex;
@@ -107,18 +99,20 @@ export interface GameState {
   active: ActiveQuestion | null;
   pendingHole: TeamIndex | null;
   history: { question: Question; winner: TeamIndex | null; points: number }[];
-  charades: CharadesRound | null;
   /** أسئلة استُخدمت في هذه الجلسة (تبقى بعد «العب مرة ثانية») — الأقدم أولاً */
   usedIds: string[];
   /** true إذا اضطررنا لإعادة استخدام أسئلة قديمة في اللوحة الحالية */
   recycledOnBoard: boolean;
+  /** Timer state: timestamp when the current main/second timer will end (for QR mode restoration) */
+  timerEndTimestamp?: number;
+  /** Call timer state: timestamp when the 30-second call timer will end */
+  callEndTimestamp?: number;
 }
 
 const freshTeam = (name: string): Team => ({
   name,
   score: 0,
   used: { phone: false, hole: false, double: false, trap: false, rest: false },
-  charadesUsed: 0,
 });
 
 const initialState: GameState = {
@@ -131,7 +125,6 @@ const initialState: GameState = {
   active: null,
   pendingHole: null,
   history: [],
-  charades: null,
   usedIds: [],
   recycledOnBoard: false,
 };
@@ -235,7 +228,7 @@ function buildCells(
 export type Outcome =
   | { kind: "correct"; team: TeamIndex }
   | { kind: "none" }
-  | { kind: "trap-wrong" };
+  | { kind: "trap-wrong"; team?: TeamIndex };
 
 type Action =
   | { type: "START"; gameName: string; names: [string, string]; catKeys: string[] }
@@ -246,13 +239,12 @@ type Action =
   | { type: "RESOLVE"; outcome: Outcome; pointsOverride?: number }
   | { type: "ADJUST"; team: TeamIndex; delta: number }
   | { type: "SET_TURN"; team: TeamIndex }
-  | { type: "OPEN_CHARADES" }
-  | { type: "SET_CHARADES_MOVIE"; movie: string }
-  | { type: "CANCEL_CHARADES" }
-  | { type: "RESOLVE_CHARADES"; guessed: boolean }
   | { type: "END" }
   | { type: "RESET" }
-  | { type: "RESET_USED" };
+  | { type: "RESET_USED" }
+  | { type: "LOAD_USED_IDS"; usedIds: string[] }
+  | { type: "SET_TIMER"; timerEndTimestamp?: number; callEndTimestamp?: number }
+  | { type: "RESTORE_GAME"; state: GameState };
 
 function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
@@ -268,6 +260,12 @@ function reducer(state: GameState, action: Action): GameState {
       const recycledIds = cells.filter((c) => c.recycled).map((c) => c.question.id);
       // recycled ids move to the end of the queue so they become "newest used"
       const usedIds = [...state.usedIds.filter((id) => !recycledIds.includes(id)), ...freshIds, ...recycledIds];
+      // Clear snapshot when starting a new game
+      try {
+        localStorage.removeItem("seen-jeem-active-game-v1");
+      } catch {
+        // Silently ignore
+      }
       return {
         ...initialState,
         phase: "board",
@@ -308,17 +306,27 @@ function reducer(state: GameState, action: Action): GameState {
       };
     }
     case "USE_LIFELINE": {
+      // hole must be armed before opening a question (ARM_HOLE -> OPEN). Disallow using hole while a question is open.
+      if (action.key === "hole") return state;
       if (!state.active) return state;
       const t = state.teams[action.team];
       if (t.used[action.key]) return state;
       const teams = [...state.teams] as [Team, Team];
       teams[action.team] = { ...t, used: { ...t.used, [action.key]: true } };
-      return {
-        ...state,
-        teams,
-        active: { ...state.active, lifelines: { ...state.active.lifelines, [action.key]: action.team } },
-      };
-    }
+          const newActive: ActiveQuestion = {
+            ...state.active,
+            lifelines: { ...state.active.lifelines, [action.key]: action.team },
+          };
+          // Trap transfers the answering opportunity to the opposing team, but keep askingTeam as original owner.
+          if (action.key === "trap") {
+            newActive.trappedTo = action.team === 0 ? 1 : 0;
+          }
+          return {
+            ...state,
+            teams,
+            active: newActive,
+          };
+        }
     case "CLOSE":
       return { ...state, phase: "board", active: null };
     case "RESOLVE": {
@@ -339,7 +347,9 @@ function reducer(state: GameState, action: Action): GameState {
           teams[o] = { ...teams[o], score: teams[o].score - pts };
         }
       } else if (action.outcome.kind === "trap-wrong") {
-        const victim = other(active.askingTeam);
+        // Deduct points from the team that actually had the answering opportunity (trappedTo),
+        // otherwise fall back to whatever team the action specified or the original asking team.
+        const victim = action.outcome.team ?? (active.trappedTo !== undefined && active.trappedTo !== null ? active.trappedTo : active.askingTeam);
         teams[victim] = { ...teams[victim], score: teams[victim].score - pts };
       }
 
@@ -352,39 +362,7 @@ function reducer(state: GameState, action: Action): GameState {
         active: null,
         turn: other(active.askingTeam),
         phase: allUsed ? "results" : "board",
-        history: [...state.history, { question: cell.question, winner, points: pts }],
-      };
-    }
-    case "OPEN_CHARADES": {
-      if (state.teams[state.turn].charadesUsed >= CHARADES_MAX_USES) return state;
-      return {
-        ...state,
-        phase: "charades",
-        pendingHole: null,
-        charades: { team: state.turn, movie: "" },
-      };
-    }
-    case "SET_CHARADES_MOVIE":
-      return state.charades
-        ? { ...state, charades: { ...state.charades, movie: action.movie } }
-        : state;
-    case "CANCEL_CHARADES":
-      return { ...state, phase: "board", charades: null };
-    case "RESOLVE_CHARADES": {
-      if (!state.charades) return state;
-      const team = state.charades.team;
-      const teams = [state.teams[0], state.teams[1]] as [Team, Team];
-      teams[team] = {
-        ...teams[team],
-        charadesUsed: teams[team].charadesUsed + 1,
-        score: teams[team].score + (action.guessed ? CHARADES_POINTS : 0),
-      };
-      return {
-        ...state,
-        teams,
-        charades: null,
-        phase: "board",
-        turn: team === 0 ? 1 : 0,
+              history: [...state.history, { question: cell.question, winner, points: action.outcome.kind === "trap-wrong" ? -pts : pts }],
       };
     }
     case "ADJUST": {
@@ -398,12 +376,24 @@ function reducer(state: GameState, action: Action): GameState {
     case "SET_TURN":
       return { ...state, turn: action.team };
     case "END":
-      return { ...state, phase: "results", active: null, charades: null };
+      // Clear snapshot when ending game
+      try {
+        localStorage.removeItem("seen-jeem-active-game-v1");
+      } catch {
+        // Silently ignore
+      }
+      return { ...state, phase: "results", active: null };
     case "RESET":
       // «العب مرة ثانية» — نحتفظ بذاكرة الأسئلة المستخدمة داخل الجلسة
       return { ...initialState, usedIds: state.usedIds };
     case "RESET_USED":
       return { ...state, usedIds: [], recycledOnBoard: false };
+    case "LOAD_USED_IDS":
+      return { ...state, usedIds: action.usedIds };
+    case "SET_TIMER":
+      return { ...state, timerEndTimestamp: action.timerEndTimestamp, callEndTimestamp: action.callEndTimestamp };
+    case "RESTORE_GAME":
+      return action.state;
     default:
       return state;
   }
@@ -429,6 +419,105 @@ const GameContext = createContext<Ctx | null>(null);
 
 export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [hydrationComplete, setHydrationComplete] = useState(false);
+  
+  // Load usedIds from localStorage on mount (hydration phase)
+  useEffect(() => {
+    const stored = localStorage.getItem("seen-jeem-used-question-ids-v1");
+    if (stored) {
+      try {
+        const usedIds = JSON.parse(stored);
+        if (Array.isArray(usedIds)) {
+          dispatch({ type: "LOAD_USED_IDS", usedIds });
+        }
+      } catch {
+        // Silently ignore malformed data
+      }
+    }
+    // Mark hydration as complete
+    setHydrationComplete(true);
+  }, []);
+
+  // Save usedIds to localStorage only AFTER hydration completes
+  useEffect(() => {
+    if (hydrationComplete) {
+      localStorage.setItem("seen-jeem-used-question-ids-v1", JSON.stringify(state.usedIds));
+    }
+  }, [state.usedIds, hydrationComplete]);
+
+  // Save game snapshot on state changes (for AirPlay/mobile resume)
+  useEffect(() => {
+    // Only save if we're actively in a game (not setup/results)
+    if (hydrationComplete && state.phase !== "setup" && state.phase !== "results") {
+      try {
+        const snapshot = {
+          version: 1,
+          phase: state.phase,
+          gameName: state.gameName,
+          teams: state.teams,
+          turn: state.turn,
+          catKeys: state.catKeys,
+          cells: state.cells,
+          active: state.active,
+          pendingHole: state.pendingHole,
+          history: state.history,
+          usedIds: state.usedIds,
+          recycledOnBoard: state.recycledOnBoard,
+          timerEndTimestamp: state.timerEndTimestamp,
+          callEndTimestamp: state.callEndTimestamp,
+          timestamp: Date.now(),
+        };
+        localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));
+      } catch {
+        // Silently ignore if too large or other errors
+      }
+    }
+  }, [state, hydrationComplete]);
+
+  // Save snapshot on visibility change and pagehide
+  useEffect(() => {
+    const saveSnapshot = () => {
+      if (state.phase !== "setup" && state.phase !== "results") {
+        try {
+          const snapshot = {
+            version: 1,
+            phase: state.phase,
+            gameName: state.gameName,
+            teams: state.teams,
+            turn: state.turn,
+            catKeys: state.catKeys,
+            cells: state.cells,
+            active: state.active,
+            pendingHole: state.pendingHole,
+            history: state.history,
+            usedIds: state.usedIds,
+            recycledOnBoard: state.recycledOnBoard,
+            timerEndTimestamp: state.timerEndTimestamp,
+            callEndTimestamp: state.callEndTimestamp,
+            timestamp: Date.now(),
+          };
+          localStorage.setItem("seen-jeem-active-game-v1", JSON.stringify(snapshot));
+        } catch {
+          // Silently ignore if error
+        }
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        saveSnapshot();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveSnapshot);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveSnapshot);
+    };
+  }, [state]);
+
   const value = useMemo<Ctx>(() => {
     const activeCell = state.active
       ? state.cells.find((c) => c.id === state.active!.cellId) ?? null

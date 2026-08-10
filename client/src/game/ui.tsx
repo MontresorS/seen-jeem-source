@@ -16,45 +16,18 @@ import { cn } from "@/lib/utils";
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <svg
-        viewBox="0 0 64 64"
-        aria-label="شعار سين وجيم"
-        role="img"
-        className="h-10 w-10 shrink-0 sm:h-12 sm:w-12"
-        fill="none"
-      >
-        <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="hsl(var(--navy))" />
-        <circle cx="32" cy="32" r="21" stroke="hsl(var(--primary))" strokeWidth="4.5" />
-        {/* س */}
-        <path
-          d="M15 27v5m4-5v5m4-5v5m-8 0h12"
-          stroke="hsl(var(--accent))"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        {/* ؟ */}
-        <path
-          d="M31 22c4 0 6.5 2.4 6.5 5.4 0 3.4-4 4.1-5 6.2-.3.7-.4 1.4-.4 2.2"
-          stroke="hsl(var(--primary))"
-          strokeWidth="3.4"
-          strokeLinecap="round"
-        />
-        <circle cx="32" cy="42" r="2.3" fill="hsl(var(--primary))" />
-        {/* ج */}
-        <path
-          d="M43 27c3.6 0 5.4 1.6 5.4 4 0 2.8-2.4 4.6-5.6 4.6"
-          stroke="hsl(var(--accent))"
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <circle cx="46" cy="40" r="1.9" fill="hsl(var(--accent))" />
-      </svg>
+      <img
+        src="/seen-jeem-logo.jpg"
+        alt="شعار سين وجيم — نسخة منتصر المحسنة"
+        style={{ objectFit: "contain" }}
+        className="h-16 w-16 shrink-0 rounded-xl border-2 border-primary/20 bg-white/80 p-1 shadow-lg sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+      />
       <span className="flex flex-col leading-none">
-        <span className="text-xl font-extrabold tracking-tight text-secondary dark:text-foreground sm:text-2xl">
+        <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
-        <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground sm:text-xs">
-          سؤال وجواب مع أصحابك
+        <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
+          Montaser's Cool Edition
         </span>
       </span>
     </span>
@@ -188,15 +161,6 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="rounded-xl border-2 border-accent/50 bg-accent/20 p-3">
-            <p className="font-extrabold text-secondary dark:text-foreground">🎬 فقرة «بدون كلام»</p>
-            <p className="mt-1">
-              الفريق الخصم يختار اسم فيلم أو مسلسل، والفريق اللي عليه الدور يمثّله{" "}
-              <b>بدون كلام</b> في <b>٦٠ ثانية</b>. النقاط ثابتة <b>٦٠٠ نقطة</b>، ومتاحة{" "}
-              <b>مرتين لكل فريق</b> في اللعبة.
-            </p>
           </div>
 
           <div className="rounded-xl border-2 border-sky-500/50 bg-sky-500/10 p-3">

@@ -9,7 +9,7 @@
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
-    --background: 36 60% 95%;
+    --background: 36 57% 89%;
     --foreground: 20 40% 15%;
     --border: 30 25% 82%;
     --card: 0 0% 100%;
@@ -222,11 +222,20 @@
   --popover-foreground: 210 40% 98%;
 }
 
+/* Ensure body uses theme variables so light/dark work correctly */
 body {
-  background-color: hsl(222 47% 7%) !important;
-    color: #000000 !important;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 button {
   border-width: 2px !important;
+}
+
+/* Setup: force category card text color to dark brown in all states (emoji untouched) */
+[data-testid^="card-category-"] .text-sm.font-extrabold,
+[data-testid^="card-category-"] .text-sm.font-extrabold:focus,
+[data-testid^="card-category-"] .text-sm.font-extrabold:hover,
+[data-testid^="card-category-"][aria-pressed="true"] .text-sm.font-extrabold {
+  color: #3E2723 !important;
 }

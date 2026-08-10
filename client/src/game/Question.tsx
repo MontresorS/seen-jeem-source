@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
-import { LIFELINES, useGame, type LifelineKey, type Outcome } from "./state";
+import { playSoundQuestion } from "@/sound-mode";
+import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
 import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
+import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
 const MAIN = 60;
@@ -18,6 +20,22 @@ function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+/** Convert Arabic/Western numerals to number */
+function parseNumber(input: string): number | null {
+  if (!input.trim()) return null;
+  // Replace Arabic numerals with Western
+  const arabicToWestern: Record<string, string> = {
+    '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+    '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9'
+  };
+  let converted = input;
+  for (const [ar, ws] of Object.entries(arabicToWestern)) {
+    converted = converted.replace(new RegExp(ar, 'g'), ws);
+  }
+  const num = parseInt(converted, 10);
+  return isNaN(num) ? null : num;
 }
 
 const LOGO_MASKS: { left: number; top: number; w: number; h: number }[][] = [
@@ -50,9 +68,91 @@ export default function QuestionView() {
   const [plays, setPlays] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const stageRef = useRef(stage);
-  stageRef.current = stage;
+  const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
+  const [clueLevel, setClueLevel] = useState(0); // 0 = no clues, 1 = first clue (600→400), 2 = second (400→200), 3 = third (200→100 or 200 min)
+  const [team1Guess, setTeam1Guess] = useState("");
+  const [team2Guess, setTeam2Guess] = useState("");
+  const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
+  // reset per-question selections when active question changes
+  useEffect(() => {
+    setSelectedChoices([]);
+    setClueLevel(0);
+    setTeam1Guess("");
+    setTeam2Guess("");
+    setSubmittedOrder([]);
+    setDraggedItem(null);
+    setOrderingComparisonResult(null);
+  }, [active?.cellId]);
+
+  // Restore timer from saved state on component mount
+  useEffect(() => {
+    if (!active?.cellId || !state.timerEndTimestamp) return;
+    
+    const now = Date.now();
+    const msRemaining = state.timerEndTimestamp - now;
+    
+    // Only restore if timer hasn't completely expired
+    if (msRemaining > 1000) {
+      const secondsRemaining = Math.ceil(msRemaining / 1000);
+      const catKey = activeCell?.catKey;
+      const isSilentFilms = catKey === "silentfilms";
+      const isDrawGuess = catKey === "drawguess";
+      
+      // For QR modes, timer ranges differ
+      const maxMain = isSilentFilms 
+        ? (activeCell?.points === 600 ? 60 : 90)
+        : isDrawGuess
+          ? 60
+          : MAIN;
+      
+      if (secondsRemaining <= maxMain) {
+        setSeconds(secondsRemaining);
+        setStage("main");
+        setRunning(true);
+      } else {
+        // Timer was in second stage
+        const secondStageSeconds = secondsRemaining - maxMain;
+        if (secondStageSeconds <= SECOND) {
+          setSeconds(secondStageSeconds);
+          setStage("second");
+          setRunning(true);
+        }
+      }
+    }
+  }, []);
+
+  // Restore call timer from saved state
+  useEffect(() => {
+    if (!state.callEndTimestamp) return;
+    
+    const now = Date.now();
+    const msRemaining = state.callEndTimestamp - now;
+    
+    if (msRemaining > 1000 && msRemaining <= CALL * 1000) {
+      setCall(Math.ceil(msRemaining / 1000));
+      setRunning(true);
+    }
+  }, []);
+
+  // Save timer state whenever it changes
+  useEffect(() => {
+    if (!active || !running) return;
+    
+    const now = Date.now();
+    const timerEndMs = now + (seconds * 1000);
+    const callEndMs = call !== null ? now + (call * 1000) : undefined;
+    
+    dispatch({
+      type: "SET_TIMER",
+      timerEndTimestamp: timerEndMs,
+      callEndTimestamp: callEndMs,
+    });
+  }, [seconds, call, running, active]);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const stageRef = useRef(stage);
+    stageRef.current = stage;
 
   useEffect(() => {
     return () => {
@@ -104,30 +204,48 @@ export default function QuestionView() {
   const isOrdering = catKey === "ordering";
   const isSounds = catKey === "sounds";
   const isCities = catKey === "cities";
+  const isWhoami = catKey === "whoami";
+  const isBeforeAfter = catKey === "beforeafter";
+  const isClosestNumber = catKey === "closestnumber";
+  const isAudienceChoice = catKey === "audiencechoice";
+  const isSilentFilms = catKey === "silentfilms";
+  const isDrawGuess = catKey === "drawguess";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
-  // قيمة السؤال الفعلية (وضح شوية تقل مع كل توضيح)
-  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : activeCell.points;
-    const resolve = (kind: "correct" | "wrong" | "skip") => {
-    const outcome: Outcome =
-      kind === "correct"
-        ? { kind: "correct", team: active.askingTeam }
-        : kind === "wrong" && usedLifelines.includes("trap")
-          ? { kind: "trap-wrong" }
-          : { kind: "none" };
-    dispatch({ type: "RESOLVE", outcome, pointsOverride: isWadda7 ? effectivePoints : undefined });
+  // whoami scoring: first clue free, then deductions
+  const whoamiPointSteps = (originalPoints: number): readonly number[] => {
+    if (originalPoints === 600) return [600, 600, 400, 200] as const;
+    if (originalPoints === 400) return [400, 400, 200, 200] as const;
+    return [200, 200, 200, 200] as const;
+  };
+  const whoamiSteps = whoamiPointSteps(activeCell.points);
+  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : (isWhoami ? whoamiSteps[Math.min(clueLevel, 3)] : activeCell.points);
+  // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
+  const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
+  const answering = state.teams[answeringTeamIdx];
+  const phoneOwnerName = state.teams[active.lifelines.phone ?? active.askingTeam].name;    const resolveCorrect = (team: 0 | 1) => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
+      };
+      const resolveNone = () => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "none" }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
+      };
+      const resolveTrapWrong = (victimTeam: 0 | 1) => {
+        dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
   };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
   const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
   const logoMask = LOGO_MASKS[qhash % LOGO_MASKS.length];
+  const movingWords = isMoving ? activeCell.question.a.split(/\s+/) : [];
   const movingLetters = isMoving
-    ? activeCell.question.a.replace(/\s+/g, "").split("")
+    ? movingWords.flatMap((w, wi) => w.split("").map((ch) => ({ ch, wi })))
     : [];
+  
+  const reversedText = isReversed ? activeCell.question.a.split("").reverse().join("") : "";
 
   const playAudio = () => {
     if (plays >= MAX_AUDIO_PLAYS || playing) return;
     if (!audioRef.current) {
-      const el = new Audio(`./audio/reversed/${activeCell.question.id}.mp3`);
+      const el = new Audio(`/reversed-audio-candidates-neural/${activeCell.question.id}-letters.mp3`);
       el.onended = () => setPlaying(false);
       el.onerror = () => setPlaying(false);
       audioRef.current = el;
@@ -139,21 +257,23 @@ export default function QuestionView() {
   };
 
   const playSoundEffect = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(`صوت ${activeCell.question.a}`);
-      utter.lang = 'ar-SA';
-      window.speechSynthesis.speak(utter);
-    }
+    if (!isSounds) return;
+    playSoundQuestion(activeCell.question.id);
   };
 
-  const total = call !== null ? CALL : stage === "main" ? MAIN : SECOND;
+  const total = call !== null 
+    ? CALL 
+    : isSilentFilms
+      ? (activeCell.points === 600 ? 60 : 90)
+      : isDrawGuess 
+        ? 60
+        : stage === "main" ? MAIN : SECOND;
   const shown = call !== null ? call : seconds;
   const label =
     call !== null
-      ? `مكالمة صديق — ${asking.name}`
+      ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
-        ? `دقيقة كاملة لـ${asking.name}`
+        ? `دقيقة كاملة لـ${answering.name}`
         : stage === "second"
           ? `١٠ ثواني لـ${other.name}`
           : "انتهى الوقت!";
@@ -165,13 +285,23 @@ export default function QuestionView() {
           variant="outline"
           className="rounded-full border-2 font-bold 2xl:h-12 2xl:text-lg"
           data-testid="button-back-to-board"
-          onClick={() => dispatch({ type: "CLOSE" })}
+          onClick={() => {
+            dispatch({ type: "SET_TIMER", timerEndTimestamp: undefined, callEndTimestamp: undefined });
+            dispatch({ type: "CLOSE" });
+          }}
         >
           <ArrowRight className="ml-1 h-4 w-4" /> تخطي / رجوع للوحة
         </Button>
-        <span className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-xl">
-          الدور على: {asking.name}
-        </span>
+        <div className="flex flex-col gap-1">
+          <span className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-xl">
+            الدور على: {asking.name}
+          </span>
+          {active.trappedTo !== undefined && active.trappedTo !== null && (
+            <div className="rounded-full border-2 border-destructive/30 bg-destructive/5 px-3 py-1 text-xs font-bold text-destructive">
+              🪤 الفخ نقل السؤال إلى: {answering.name}
+            </div>
+          )}
+        </div>
       </div>
       <div className="sj-pop overflow-hidden rounded-3xl border-2 border-card-border bg-card sj-shadow-lg">
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
@@ -242,8 +372,42 @@ export default function QuestionView() {
                 className="break-words text-center text-xl font-extrabold leading-relaxed sm:text-2xl 2xl:text-4xl"
                 style={{ color: QUESTION_TEXT_COLOR }}
               >
-                {activeCell.question.q}
+                {reversedText}
               </p>
+            </div>
+          ) : isMoving ? null : isSilentFilms ? (
+            <div className="mt-4 flex flex-col items-center gap-4">
+              <QRDisplay
+                payload={activeCell.question.a}
+                size={288}
+                instruction="امسح الرمز بالهاتف لمعرفة اسم الفيلم — ممنوع الكلام"
+              />
+              {revealed && (
+                <p
+                  dir="rtl"
+                  className="text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl"
+                  style={{ color: QUESTION_TEXT_COLOR }}
+                >
+                  {activeCell.question.a}
+                </p>
+              )}
+            </div>
+          ) : isDrawGuess ? (
+            <div className="mt-4 flex flex-col items-center gap-4">
+              <QRDisplay
+                payload={activeCell.question.a}
+                size={288}
+                instruction="امسح الرمز بالهاتف لمعرفة ما سترسمه"
+              />
+              {revealed && (
+                <p
+                  dir="rtl"
+                  className="text-center text-2xl font-extrabold sm:text-3xl 2xl:text-5xl"
+                  style={{ color: QUESTION_TEXT_COLOR }}
+                >
+                  {activeCell.question.a}
+                </p>
+              )}
             </div>
           ) : (
             <p
@@ -258,25 +422,354 @@ export default function QuestionView() {
               {activeCell.question.q}
             </p>
           )}
+
+          {/* MCQ choices rendering */}
+          {catKey === 'truefalse' ? (
+            <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-truefalse">
+              <p className="text-center text-lg font-extrabold" style={{ color: QUESTION_TEXT_COLOR }}>اختر: صح أم فخ؟</p>
+              <div className="flex w-full max-w-md justify-center gap-4">
+                {(activeCell.question.choices || ["صح", "فخ"]).slice(0,2).map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedChoices([choice])}
+                      className={cn(
+                        "flex-1 rounded-2xl border-2 px-6 py-4 text-xl font-black sm:text-2xl",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-sm text-muted-foreground">التحديد يعرض فقط؛ اختر النتيجة النهائية بعد كشف الإجابة.</div>
+            </div>
+          ) : Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-choices">
+              <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
+                {activeCell.question.choices.map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  const maxAllowed = active.lifelines.double === active.askingTeam ? 2 : 1;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        if (selected) setSelectedChoices((s) => s.filter((x) => x !== choice));
+                        else if (selectedChoices.length < maxAllowed) setSelectedChoices((s) => [...s, choice]);
+                      }}
+                      className={cn(
+                        "rounded-2xl border-2 px-3 py-2 text-sm font-black sm:text-base",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+              {Array.isArray(activeCell.question.correctChoices) && activeCell.question.correctChoices.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {selectedChoices.length > 0
+                    ? ((): JSX.Element => {
+                        const a = [...selectedChoices].sort().join("||");
+                        const b = [...activeCell.question.correctChoices!].sort().join("||");
+                        return <span>{a === b ? "اختيارات تتطابق مع الإجابات الصحيحة" : "اختيارات لا تطابق الإجابات الصحيحة"}</span>;
+                      })()
+                    : <span>اختر إجابة{active.lifelines.double === active.askingTeam ? " (مسموح باثنين)" : " (مسموح بواحدة)"}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Whoami with progressive clue reveal */}
+          {isWhoami && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-whoami">
+              <div className="w-full max-w-xl rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                <p className="mb-3 text-center text-sm font-bold text-primary sm:text-base">النقاط الحالية: {effectivePoints}</p>
+                <div className="flex flex-col gap-2">
+                  {activeCell.question.clues?.map((clue, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "rounded-lg border-2 px-4 py-2 text-sm transition-all sm:text-base",
+                        clueLevel > idx
+                          ? "border-primary bg-primary/10 text-foreground font-semibold"
+                          : "border-muted bg-card text-muted-foreground"
+                      )}
+                    >
+                      <span className="font-black text-primary mr-2">{idx + 1}.</span>
+                      {clueLevel > idx ? clue : "🔒"}
+                    </div>
+                  ))}
+                </div>
+                {clueLevel < (activeCell.question.clues?.length ?? 0) && (
+                  <button
+                    onClick={() => setClueLevel((c) => Math.min(c + 1, (activeCell.question.clues?.length ?? 0)))}
+                    className="mt-3 w-full rounded-lg bg-primary/20 px-3 py-2 text-sm font-black text-primary hover:bg-primary/30 sm:text-base"
+                  >
+                    الكشف عن تلميح (النقاط: {whoamiPointSteps[Math.min(clueLevel + 1, 2)]} بعده)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Beforeafter with two large choice buttons */}
+          {isBeforeAfter && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-beforeafter">
+              <div className="w-full max-w-md flex flex-col gap-3">
+                {(activeCell.question.choices || []).map((choice, idx) => {
+                  const selected = selectedChoices.includes(choice);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedChoices([choice])}
+                      className={cn(
+                        "rounded-2xl border-2 px-6 py-4 text-lg font-black sm:text-xl transition-all",
+                        selected ? "bg-primary text-primary-foreground border-primary" : "bg-card border-card-border hover:border-primary"
+                      )}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Closestnumber with numeric input */}
+          {isClosestNumber && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-closestnumber">
+              <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                <p className="mb-4 text-center text-sm font-bold text-primary sm:text-base">أدخل الرقم الصحيح لكل فريق</p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 1: {asking.name}</label>
+                    <input
+                      type="text"
+                      value={team1Guess}
+                      onChange={(e) => setTeam1Guess(e.target.value)}
+                      placeholder="أدخل الرقم"
+                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 2: {other.name}</label>
+                    <input
+                      type="text"
+                      value={team2Guess}
+                      onChange={(e) => setTeam2Guess(e.target.value)}
+                      placeholder="أدخل الرقم"
+                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+                {(team1Guess || team2Guess) && activeCell.question.numericAnswer !== undefined && (
+                  <div className="mt-3 rounded-lg bg-primary/10 p-3 text-center">
+                    {(() => {
+                      const n1 = parseNumber(team1Guess);
+                      const n2 = parseNumber(team2Guess);
+                      if (n1 === null && n2 === null) return <span className="text-xs text-muted-foreground">ادخل الأرقام</span>;
+                      const diff1 = n1 !== null ? Math.abs(n1 - activeCell.question.numericAnswer) : Infinity;
+                      const diff2 = n2 !== null ? Math.abs(n2 - activeCell.question.numericAnswer) : Infinity;
+                      if (diff1 === diff2 && diff1 !== Infinity) {
+                        return <span className="text-sm font-black text-primary">تعادل — لا نقاط</span>;
+                      }
+                      const winner = diff1 < diff2 ? asking.name : other.name;
+                      return <span className="text-sm font-black text-primary">الأقرب: {winner}</span>;
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Audiencechoice with percentage bars */}
+          {isAudienceChoice && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-audiencechoice">
+              {!revealed && activeCell.question.choices && (
+                <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                  <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm">الاختيارات:</p>
+                  <div className="space-y-2">
+                    {activeCell.question.choices.map((choice, idx) => (
+                      <div key={idx} className="rounded-lg border-2 border-primary/40 bg-card px-4 py-2 text-center font-bold text-primary">
+                        {choice}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {revealed && activeCell.question.audiencePercentages && (
+                <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
+                  <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm">نسب الاختيار:</p>
+                  <div className="space-y-2">
+                    {(activeCell.question.choices || []).map((choice, idx) => {
+                      const percentage = activeCell.question.audiencePercentages?.[choice] ?? 0;
+                      const isCorrect = activeCell.question.correctChoices?.includes(choice);
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between text-xs font-bold">
+                            <span>{choice}</span>
+                            <span>{percentage}%</span>
+                          </div>
+                          <div className="h-4 overflow-hidden rounded-full bg-muted-foreground/20">
+                            <div
+                              className={cn(
+                                "h-full rounded-full transition-all",
+                                isCorrect ? "bg-green-500" : "bg-blue-500"
+                              )}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {isOrdering && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-ordering">
-              <div className="w-full max-w-xl rounded-2xl border-2 border-card-border bg-muted/30 p-4 text-center">
-                <span className="text-xs font-bold text-muted-foreground sm:text-sm 2xl:text-lg">العناصر غير مرتبة — قم بترتيبها:</span>
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {activeCell.question.q.includes("[") ? (
-                    activeCell.question.q.split("[")[1]?.split("]")[0]?.split("،").map((item, idx) => (
-                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
-                        {item.trim()}
-                      </span>
-                    ))
-                  ) : (
-                    activeCell.question.a.split("➔").sort(() => 0.5 - ((qhash + idx) % 10) / 10).map((item, idx) => (
-                      <span key={idx} className="rounded-xl border-2 border-primary/40 bg-card px-3 py-1.5 text-sm font-black text-primary shadow-sm sm:text-base 2xl:text-2xl">
-                        {item.trim()}
-                      </span>
-                    ))
-                  )}
-                </div>
+              <div className="w-full max-w-2xl rounded-2xl border-2 border-card-border bg-muted/30 p-4">
+                <p className="mb-3 text-center text-xs font-bold text-primary sm:text-sm 2xl:text-base">
+                  رتّب العناصر:
+                </p>
+
+                {/* Initialize order from orderItems if not already set */}
+                {submittedOrder.length === 0 && activeCell.question.orderItems && submittedOrder.length === 0 ? (
+                  <div className="text-center text-xs text-muted-foreground">تحميل العناصر...</div>
+                ) : null}
+
+                {/* Current submitted order or shuffled if empty */}
+                {(() => {
+                  const currentOrder = submittedOrder.length > 0 
+                    ? submittedOrder
+                    : (activeCell.question.orderItems || []);
+                  
+                  if (currentOrder.length === 0) {
+                    return <div className="text-xs text-center text-muted-foreground">لا توجد عناصر للترتيب</div>;
+                  }
+
+                  return (
+                    <>
+                      {/* Ordered items */}
+                      <div className="space-y-2">
+                        {currentOrder.map((item, idx) => (
+                          <div
+                            key={`${item}-${idx}`}
+                            draggable
+                            onDragStart={() => setDraggedItem(item)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (!draggedItem || draggedItem === item) return;
+                              const newOrder = [...currentOrder];
+                              const fromIdx = newOrder.indexOf(draggedItem);
+                              if (fromIdx === -1) return;
+                              newOrder.splice(fromIdx, 1);
+                              newOrder.splice(idx, 0, draggedItem);
+                              setSubmittedOrder(newOrder);
+                              setDraggedItem(null);
+                            }}
+                            className={cn(
+                              "flex items-center justify-between rounded-lg border-2 px-4 py-2 text-sm font-bold transition-all 2xl:text-base",
+                              draggedItem === item
+                                ? "border-primary/50 bg-primary/20 opacity-75"
+                                : "border-primary/30 bg-card cursor-move hover:border-primary/50"
+                            )}
+                          >
+                            <span className="text-xs text-muted-foreground font-bold 2xl:text-sm">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1 text-right px-3">{item}</span>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => {
+                                  if (idx > 0) {
+                                    const newOrder = [...currentOrder];
+                                    [newOrder[idx], newOrder[idx - 1]] = [
+                                      newOrder[idx - 1],
+                                      newOrder[idx],
+                                    ];
+                                    setSubmittedOrder(newOrder);
+                                  }
+                                }}
+                                disabled={idx === 0}
+                                className="rounded px-2 py-1 bg-primary/20 text-xs font-bold text-primary disabled:opacity-30 hover:bg-primary/30"
+                                title="رفع"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (idx < currentOrder.length - 1) {
+                                    const newOrder = [...currentOrder];
+                                    [newOrder[idx], newOrder[idx + 1]] = [
+                                      newOrder[idx + 1],
+                                      newOrder[idx],
+                                    ];
+                                    setSubmittedOrder(newOrder);
+                                  }
+                                }}
+                                disabled={idx === currentOrder.length - 1}
+                                className="rounded px-2 py-1 bg-primary/20 text-xs font-bold text-primary disabled:opacity-30 hover:bg-primary/30"
+                                title="خفض"
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Confirm button */}
+                      <button
+                        onClick={() => {
+                          if (activeCell.question.correctOrder) {
+                            const isCorrect =
+                              JSON.stringify(currentOrder) ===
+                              JSON.stringify(activeCell.question.correctOrder);
+                            setOrderingComparisonResult(isCorrect ? "correct" : "incorrect");
+                          }
+                        }}
+                        className="mt-4 w-full rounded-lg bg-primary px-4 py-2 font-bold text-primary-foreground hover:bg-primary/90 text-sm 2xl:text-base"
+                      >
+                        تأكيد الترتيب
+                      </button>
+
+                      {/* Comparison result */}
+                      {orderingComparisonResult === "correct" && (
+                        <div className="mt-3 rounded-lg bg-green-500/20 border-2 border-green-500 p-3 text-center">
+                          <span className="text-sm font-bold text-green-600 2xl:text-base">✓ الترتيب صحيح!</span>
+                        </div>
+                      )}
+                      {orderingComparisonResult === "incorrect" && (
+                        <div className="mt-3 rounded-lg bg-destructive/20 border-2 border-destructive p-3 text-center">
+                          <span className="text-sm font-bold text-destructive 2xl:text-base">✗ الترتيب خاطئ</span>
+                          {revealed && activeCell.question.correctOrder && (
+                            <div className="mt-2 space-y-1 text-xs">
+                              <p className="font-bold">الترتيب الصحيح:</p>
+                              {activeCell.question.correctOrder.map((item, idx) => (
+                                <div key={idx} className="text-foreground">
+                                  {idx + 1}. {item}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -303,48 +796,51 @@ export default function QuestionView() {
               className="relative mx-auto mt-4 h-48 w-full max-w-2xl overflow-hidden rounded-2xl border-2 border-dashed border-card-border bg-muted/50 p-4 2xl:h-72"
               data-testid="block-moving-letters"
             >
-              {movingLetters.map((ch, i) => {
-                const totalLetters = movingLetters.length;
-                const cols = Math.ceil(Math.sqrt(totalLetters * 1.5));
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                const maxRows = Math.ceil(totalLetters / cols);
+              {movingLetters.map((item, i) => {
+                              const ch = item.ch;
+                              const wi = item.wi;
+                              const totalLetters = movingLetters.length;
+                              const cols = Math.ceil(Math.sqrt(totalLetters * 1.5));
+                              const col = i % cols;
+                              const row = Math.floor(i / cols);
+                              const maxRows = Math.ceil(totalLetters / cols);
 
-                const colWidth = 82 / Math.max(cols, 1);
-                const rowHeight = 72 / Math.max(maxRows, 1);
+                              const colWidth = 82 / Math.max(cols, 1);
+                              const rowHeight = 72 / Math.max(maxRows, 1);
 
-                const baseLeft = 6 + col * colWidth;
-                const baseTop = 8 + row * rowHeight;
+                              const baseLeft = 6 + col * colWidth;
+                              const baseTop = 8 + row * rowHeight;
 
-                const h = hashStr(`${activeCell.question.id}-${i}`);
-                const jitterLeft = (h % 10) - 5;
-                const jitterTop = ((h >> 3) % 8) - 4;
+                              const h = hashStr(`${activeCell.question.id}-${i}`);
+                              const jitterLeft = (h % 10) - 5;
+                              const jitterTop = ((h >> 3) % 8) - 4;
 
-                                                        const left = Math.max(10, Math.min(78, baseLeft + jitterLeft));
-                const top = Math.max(10, Math.min(68, baseTop + jitterTop));
+                              const left = Math.max(10, Math.min(78, baseLeft + jitterLeft));
+                              const top = Math.max(10, Math.min(68, baseTop + jitterTop));
 
-                const animClass = `sj-drift-${(i % 4) + 1}`;
-                const dur = 2.8 + ((h >> 4) % 20) / 10;
-                const delay = -((h >> 2) % 25) / 10;
-                return (
-                  <span
-                    key={i}
-                    className={cn(
-                      "absolute text-4xl font-black sm:text-5xl 2xl:text-7xl",
-                      animClass
-                    )}
-                    style={{
-                      left: `${left}%`,
-                      top: `${top}%`,
-                      animationDuration: `${dur}s`,
-                      animationDelay: `${delay}s`,
-                      color: QUESTION_TEXT_COLOR,
-                    }}
-                  >
-                    {ch}
-                  </span>
-                );
-              })}
+                              const animClass = `sj-drift-${(i % 4) + 1}`;
+                              const dur = 2.8 + ((h >> 4) % 20) / 10;
+                              const delay = -((h >> 2) % 25) / 10;
+                              const color = wi === 0 ? QUESTION_TEXT_COLOR : "#0B3D91";
+                              return (
+                                <span
+                                  key={i}
+                                  className={cn(
+                                    "absolute text-4xl font-black sm:text-5xl 2xl:text-7xl",
+                                    animClass
+                                  )}
+                                  style={{
+                                    left: `${left}%`,
+                                    top: `${top}%`,
+                                    animationDuration: `${dur}s`,
+                                    animationDelay: `${delay}s`,
+                                    color,
+                                  }}
+                                >
+                                  {ch}
+                                </span>
+                              );
+                            })}
             </div>
           )}
           {hasImage && (isWadda7 || isZoom) && (
@@ -437,26 +933,36 @@ export default function QuestionView() {
               {usedLifelines.length === 0 ? (
                 <span className="text-xs text-muted-foreground 2xl:text-base">لم تُستخدم أي وسيلة</span>
               ) : (
-                usedLifelines.map((k) => (
-                  <LifelineChip key={k} lifelineKey={k} teamName={state.teams[active.lifelines[k]!].name} />
-                ))
+                usedLifelines.map((k) => {
+                  const ownerIdx = active.lifelines[k]!;
+                  return (
+                    <div key={k} className="flex items-center gap-2">
+                      <LifelineChip meta={LIFELINE_BY_KEY[k]} used={true} compact />
+                      <span className="text-xs font-bold text-muted-foreground">{state.teams[ownerIdx].name}</span>
+                    </div>
+                  );
+                })
               )}
             </div>
            {!revealed && (
   <div className="mt-4 flex flex-wrap justify-center gap-2">
-    {LIFELINES.map((l) => (
+    {LIFELINES.filter((l) => l.key !== "hole").map((l) => (
       <Button
         key={l.key}
         size="sm"
         variant="outline"
-        disabled={state.teams[active.askingTeam].used[l.key] || active.lifelines[l.key] !== undefined || (l.key === "phone" && call !== null)}
+        disabled={
+          state.teams[active.askingTeam].used[l.key] ||
+          active.lifelines[l.key] !== undefined ||
+          (l.key === "phone" && call !== null)
+        }
         onClick={() => {
           if (l.key === "phone") setCall(CALL);
           dispatch({ type: "USE_LIFELINE", key: l.key, team: active.askingTeam });
         }}
         className="rounded-full border-2 text-xs font-bold 2xl:h-11 2xl:px-4 2xl:text-lg"
       >
-        <LifelineIcon name={l.icon} className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
+        <LifelineIcon k={l.key} className="ml-1 h-3.5 w-3.5 2xl:h-5 2xl:w-5" />
         {l.name}
       </Button>
     ))}
@@ -466,30 +972,39 @@ export default function QuestionView() {
           {revealed && (
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
               <Button
-                data-testid="button-correct"
-                onClick={() => resolve("correct")}
+                          data-testid="button-team0-correct"
+                          onClick={() => resolveCorrect(0)}
                 className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
               >
-                إجابة صحيحة (+{effectivePoints})
+                          {state.teams[0].name} إجابة صحيحة (+{effectivePoints})
               </Button>
               <Button
-                data-testid="button-wrong"
-                onClick={() => resolve("wrong")}
-                variant="destructive"
-                className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
-              >
-                إجابة خاطئة
-              </Button>
-              <Button
-                data-testid="button-skip"
-                onClick={() => resolve("skip")}
-                variant="outline"
-                className="rounded-2xl border-2 font-bold 2xl:h-20 2xl:text-2xl"
-              >
-                إلغاء / لا أحد
-              </Button>
-            </div>
-          )}
+                          data-testid="button-team1-correct"
+                          onClick={() => resolveCorrect(1)}
+                          className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+                        >
+                          {state.teams[1].name} إجابة صحيحة (+{effectivePoints})
+                        </Button>
+                        <Button
+                          data-testid="button-skip"
+                          onClick={() => resolveNone()}
+                          variant="outline"
+                          className="rounded-2xl border-2 font-bold 2xl:h-20 2xl:text-2xl"
+                        >
+                          إلغاء / لا أحد
+                        </Button>
+                        {active.lifelines.trap !== undefined && (
+                          <Button
+                            data-testid="button-trap-wrong"
+                            onClick={() => resolveTrapWrong(answeringTeamIdx)}
+                            variant="destructive"
+                            className="sj-press h-14 rounded-2xl border-2 border-destructive text-lg font-black sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+                          >
+                            {state.teams[answeringTeamIdx].name} إجابة خاطئة (-{effectivePoints})
+                          </Button>
+                        )}
+                      </div>
+                    )}
         </div>
       </div>
     </div>

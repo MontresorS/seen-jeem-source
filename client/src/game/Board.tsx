@@ -12,13 +12,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { CATEGORY_BY_KEY } from "@/data/questions";
-import {
-  CHARADES_MAX_USES,
-  CHARADES_POINTS,
-  LIFELINES,
-  useGame,
-  type TeamIndex,
-} from "./state";
+import { LIFELINES, useGame, type TeamIndex } from "./state";
 import { HelpDialog, LifelineChip, Logo } from "./ui";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +22,6 @@ function TeamPanel({ index }: { index: TeamIndex }) {
   const { state, dispatch } = useGame();
   const team = state.teams[index];
   const isTurn = state.turn === index;
-  const charadesLeft = CHARADES_MAX_USES - team.charadesUsed;
   return (
     <div
       data-testid={`panel-team-${index + 1}`}
@@ -52,9 +45,6 @@ function TeamPanel({ index }: { index: TeamIndex }) {
           </p>
           <p className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground 2xl:text-lg">
             {isTurn && <span className="text-primary">الدور عليه الآن •</span>}
-            <span data-testid={`text-charades-left-${index + 1}`}>
-              🎬 ×{charadesLeft}
-            </span>
           </p>
         </button>
         <div className="flex shrink-0 items-center gap-1 2xl:gap-2">
@@ -111,7 +101,6 @@ export default function Board() {
   const { state, dispatch, remaining } = useGame();
   const holeArmedBy = state.pendingHole;
   const turnTeam = state.teams[state.turn];
-  const charadesLeft = CHARADES_MAX_USES - turnTeam.charadesUsed;
   return (
     <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 lg:h-[100dvh] lg:overflow-hidden lg:pb-3 2xl:gap-3 2xl:px-6">
       {/* top bar — always visible */}
@@ -190,23 +179,6 @@ export default function Board() {
               <>الدور على: {turnTeam.name}</>
             )}
           </div>
-          <button
-            type="button"
-            data-testid="button-charades"
-            disabled={charadesLeft <= 0}
-            onClick={() => dispatch({ type: "OPEN_CHARADES" })}
-            className={cn(
-              "sj-press flex items-center justify-center gap-2 rounded-2xl border-2 px-3 py-2 text-sm font-black 2xl:py-4 2xl:text-2xl",
-              charadesLeft > 0
-                ? "border-accent-border bg-accent text-accent-foreground sj-shadow"
-                : "cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground/60",
-            )}
-          >
-            🎬 بدون كلام — {CHARADES_POINTS} نقطة
-            <span className="rounded-full bg-secondary/15 px-2 text-xs font-black 2xl:text-lg">
-              ×{charadesLeft}
-            </span>
-          </button>
         </div>
         <TeamPanel index={1} />
       </div>
