@@ -12,6 +12,7 @@
     "generate:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts generate",
     "review:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts review",
     "validate:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts validate",
+    "promote:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts promote",
     "apply:zoom-wadda7-assets": "tsx scripts/zoom-wadda7-local-workflow.ts apply",
     "generate:reversed-candidates:neural": "node scripts/generate-reversed-candidates-elevenlabs.mjs",
     "verify:reversed-candidates:neural": "node scripts/verify-reversed-candidates-neural.mjs"

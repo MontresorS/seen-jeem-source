@@ -110,8 +110,11 @@ const approvalDraftPath = path.join(outputRoot, "zoom-wadda7.approved.json");
 const generatedSourceRoot = path.join(inputRoot, "generated-source-images");
 const appliedMappingPath = path.join(repoRoot, "client", "src", "data", "zoom-wadda7-approved-assets.ts");
 const publicImagesRoot = path.join(repoRoot, "client", "public", "images");
-const generatedZoomDir = path.join(publicImagesRoot, "generated", "zoom");
-const generatedWadda7Dir = path.join(publicImagesRoot, "generated", "wadda7");
+const stagedGeneratedRoot = path.join(outputRoot, "generated");
+const stagedGeneratedZoomDir = path.join(stagedGeneratedRoot, "zoom");
+const stagedGeneratedWadda7Dir = path.join(stagedGeneratedRoot, "wadda7");
+const promotedGeneratedZoomDir = path.join(publicImagesRoot, "generated", "zoom");
+const promotedGeneratedWadda7Dir = path.join(publicImagesRoot, "generated", "wadda7");
 
 const force = process.argv.includes("--force");
 const dryRun = process.argv.includes("--dry-run");
@@ -153,12 +156,13 @@ async function main(): Promise<void> {
     case "validate":
       await validateAppliedAndDraftMappings();
       return;
+    case "promote":
     case "apply":
-      await applyApprovedMappings();
+      await promoteApprovedMappings();
       return;
     default:
       throw new Error(
-        "Usage: tsx scripts/zoom-wadda7-local-workflow.ts <generate|review|validate|apply> [--force] [--dry-run] [--pollinations-base-url=<url>]",
+        "Usage: tsx scripts/zoom-wadda7-local-workflow.ts <generate|review|validate|promote> [--force] [--dry-run] [--pollinations-base-url=<url>]",
       );
   }
 }
@@ -178,8 +182,8 @@ async function generateAssets(): Promise<void> {
   }
 
   ensureDir(generatedSourceRoot);
-  ensureDir(generatedZoomDir);
-  ensureDir(generatedWadda7Dir);
+  ensureDir(stagedGeneratedZoomDir);
+  ensureDir(stagedGeneratedWadda7Dir);
   ensureDir(outputRoot);
 
   const requestBudget = { used: 0 };
@@ -655,18 +659,30 @@ async function validateAppliedAndDraftMappings(): Promise<void> {
   console.log("Zoom/Wadda7 validation passed");
 }
 
-async function applyApprovedMappings(): Promise<void> {
+async function promoteApprovedMappings(): Promise<void> {
   const manifest = loadManifest();
   const approvals = loadApprovalDraft(true);
   const errors: string[] = [];
   await validateApprovalDraft(manifest, approvals, errors);
 
   if (errors.length > 0) {
-    throw new Error(`Cannot apply approvals:\n- ${dedupe(errors).join("\n- ")}`);
+    throw new Error(`Cannot promote approvals:\n- ${dedupe(errors).join("\n- ")}`);
   }
 
   const manifestByEntryId = new Map(manifest.entries.map((entry) => [entry.entryId, entry]));
   const approvedQuestionIds = new Set<string>();
+  ensureDir(promotedGeneratedZoomDir);
+  ensureDir(promotedGeneratedWadda7Dir);
+
+  const existingPromotedPaths = new Set<string>();
+  for (const asset of Object.values(APPROVED_ZOOM_WADDA7_ASSETS)) {
+    if (asset.category === "zoom") {
+      existingPromotedPaths.add(asset.image);
+    } else {
+      for (const stage of asset.stages) existingPromotedPaths.add(stage);
+    }
+  }
+
   const mappings = approvals.entries
     .filter((entry) => entry.status === "approved")
     .map((approval) => {
@@ -683,6 +699,7 @@ async function applyApprovedMappings(): Promise<void> {
         if (!selectedOutput) {
           throw new Error(`Approved zoom mapping ${manifestEntry.entryId} references missing output label ${selectedLabel}`);
         }
+        const promotedPath = promoteGeneratedOutput(manifestEntry.category, selectedOutput.relativePath);
         return [
           questionId,
           {
@@ -692,7 +709,7 @@ async function applyApprovedMappings(): Promise<void> {
             questionPrompt: manifestEntry.questionPrompt,
             answerOrDescription: manifestEntry.answerOrDescription,
             pointTier: manifestEntry.pointTier,
-            image: toPublicRelative(selectedOutput.relativePath),
+            image: promotedPath,
           },
         ] as const;
       }
@@ -702,7 +719,7 @@ async function applyApprovedMappings(): Promise<void> {
         if (!output) {
           throw new Error(`Approved wadda7 mapping ${manifestEntry.entryId} is missing ${label}`);
         }
-        return toPublicRelative(output.relativePath);
+        return promoteGeneratedOutput(manifestEntry.category, output.relativePath);
       }) as [string, string, string];
 
       return [
@@ -719,6 +736,22 @@ async function applyApprovedMappings(): Promise<void> {
       ] as const;
     })
     .sort(([left], [right]) => left.localeCompare(right, "en"));
+
+  const nextPromotedPaths = new Set<string>();
+  for (const [, asset] of mappings) {
+    if (asset.category === "zoom") {
+      nextPromotedPaths.add(asset.image);
+    } else {
+      for (const stage of asset.stages) nextPromotedPaths.add(stage);
+    }
+  }
+  for (const publicRelativePath of existingPromotedPaths) {
+    if (nextPromotedPaths.has(publicRelativePath)) continue;
+    const absolutePath = resolvePublicImagePath(publicRelativePath);
+    if (fs.existsSync(absolutePath)) {
+      fs.rmSync(absolutePath, { force: true });
+    }
+  }
 
   const content = `export type ApprovedZoomAsset = {
   category: "zoom";
@@ -750,7 +783,7 @@ export function getApprovedZoomWadda7Asset(questionId: string): ApprovedZoomWadd
 `;
 
   fs.writeFileSync(appliedMappingPath, content, "utf8");
-  console.log(`Applied ${mappings.length} approved mappings to ${toRepoRelative(appliedMappingPath)}`);
+  console.log(`Promoted ${mappings.length} approved mappings into client/public/images/generated/ and ${toRepoRelative(appliedMappingPath)}`);
 }
 
 async function validateApprovalDraft(manifest: GeneratedManifest, approvals: ApprovalFile, errors: string[]): Promise<void> {
@@ -805,7 +838,7 @@ async function validateApprovalDraft(manifest: GeneratedManifest, approvals: App
       if (!selectedOutput) {
         errors.push(`Approved zoom entry ${approval.entryId} uses a missing crop label: ${selectedLabel}`);
       } else {
-        await validateImagePath(toPublicRelative(selectedOutput.relativePath), `Approved zoom entry ${approval.entryId}`, errors);
+        await validateRepoRelativeImagePath(selectedOutput.relativePath, `Approved zoom entry ${approval.entryId}`, errors);
       }
     } else {
       for (const label of ["stage-600", "stage-400", "stage-200"]) {
@@ -814,7 +847,7 @@ async function validateApprovalDraft(manifest: GeneratedManifest, approvals: App
           errors.push(`Approved wadda7 entry ${approval.entryId} is missing ${label}`);
           continue;
         }
-        await validateImagePath(toPublicRelative(stage.relativePath), `Approved wadda7 entry ${approval.entryId} ${label}`, errors);
+        await validateRepoRelativeImagePath(stage.relativePath, `Approved wadda7 entry ${approval.entryId} ${label}`, errors);
       }
     }
   }
@@ -943,7 +976,7 @@ async function generateZoomOutputs(entry: SourceEntry, sourcePath: string, outpu
 
   for (const [index, crop] of crops.entries()) {
     const filename = `${outputName}--${labels[index]}.jpg`;
-    const absolutePath = path.join(generatedZoomDir, filename);
+    const absolutePath = path.join(stagedGeneratedZoomDir, filename);
     if (force || !fs.existsSync(absolutePath)) {
       await sharp(sourcePath)
         .rotate()
@@ -984,7 +1017,7 @@ async function generateWadda7Outputs(sourcePath: string, outputName: string): Pr
 
   for (const variant of variants) {
     const filename = `${outputName}--${variant.label}.jpg`;
-    const absolutePath = path.join(generatedWadda7Dir, filename);
+    const absolutePath = path.join(stagedGeneratedWadda7Dir, filename);
     if (force || !fs.existsSync(absolutePath)) {
       let pipeline = sharp(baseBuffer);
       if (variant.pixelateTo) {
@@ -1081,7 +1114,7 @@ function loadManifest(): GeneratedManifest {
 function loadApprovalDraft(required: boolean): ApprovalFile {
   if (!fs.existsSync(approvalDraftPath)) {
     if (required) {
-      throw new Error(`Save the downloaded approval file to ${toRepoRelative(approvalDraftPath)} before applying.`);
+      throw new Error(`Save the downloaded review approval file to ${toRepoRelative(approvalDraftPath)} before promoting.`);
     }
     return { schemaVersion: 2, savedAt: new Date(0).toISOString(), entries: [] };
   }
@@ -1119,6 +1152,25 @@ function toRepoRelative(absolutePath: string): string {
 
 function toPublicRelative(repoRelativePath: string): string {
   return `./images/${repoRelativePath.replace(/^client\/public\/images\//, "")}`;
+}
+
+function resolvePublicImagePath(publicRelativePath: string): string {
+  if (!publicRelativePath.startsWith("./images/")) {
+    throw new Error(`Public image path must stay under ./images/, got ${publicRelativePath}`);
+  }
+  return path.join(publicImagesRoot, publicRelativePath.replace("./images/", ""));
+}
+
+function promoteGeneratedOutput(category: WorkflowCategory, stagedRepoRelativePath: string): string {
+  const sourceAbsolutePath = path.join(repoRoot, stagedRepoRelativePath);
+  if (!fs.existsSync(sourceAbsolutePath)) {
+    throw new Error(`Approved ${category} output is missing: ${stagedRepoRelativePath}`);
+  }
+  const targetDir = category === "zoom" ? promotedGeneratedZoomDir : promotedGeneratedWadda7Dir;
+  const targetAbsolutePath = path.join(targetDir, path.basename(stagedRepoRelativePath));
+  ensureDir(path.dirname(targetAbsolutePath));
+  fs.copyFileSync(sourceAbsolutePath, targetAbsolutePath);
+  return toPublicRelative(toRepoRelative(targetAbsolutePath));
 }
 
 function relativeFilePath(fromFile: string, toFile: string): string {
@@ -1169,8 +1221,8 @@ function printDryRunPlan(entries: SourceEntry[], requestPlanCount: number): void
       wouldFetchPollinations: !entry.source && (force || !fs.existsSync(sourceAbsolutePath)),
       outputs:
         entry.category === "zoom"
-          ? ["close-1", "close-2", "close-3"].map((label) => `client/public/images/generated/zoom/${outputName}--${label}.jpg`)
-          : ["stage-600", "stage-400", "stage-200"].map((label) => `client/public/images/generated/wadda7/${outputName}--${label}.jpg`),
+          ? ["close-1", "close-2", "close-3"].map((label) => `local-workflows/zoom-wadda7/output/generated/zoom/${outputName}--${label}.jpg`)
+          : ["stage-600", "stage-400", "stage-200"].map((label) => `local-workflows/zoom-wadda7/output/generated/wadda7/${outputName}--${label}.jpg`),
     };
   });
 
