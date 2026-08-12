@@ -13,6 +13,7 @@ const SECOND = 10;
 const CALL = 30;
 const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فقط
 const WADDA7_STEPS = [600, 400, 200] as const;
+const WADDA7_INITIAL_RUNTIME_BLUR_CLASS = "blur-[18px]";
 const QUESTION_TEXT_COLOR = "#3E2723"; // dark brown
 
 /** hash ثابت من نص — لتوليد عشوائية ثابتة لكل سؤال */
@@ -851,7 +852,7 @@ export default function QuestionView() {
                   alt="صورة السؤال"
                   className={cn(
                     "max-h-[260px] w-auto max-w-full object-contain transition-all duration-500 sm:max-h-[340px] 2xl:max-h-[500px]",
-                    isWadda7 && (clarify === 0 ? "blur-xl" : clarify === 1 ? "blur-md" : "blur-0"),
+                    isWadda7 && (clarify === 0 ? WADDA7_INITIAL_RUNTIME_BLUR_CLASS : clarify === 1 ? "blur-md" : "blur-0"),
                   )}
                   style={
                     isZoom
