@@ -7,6 +7,8 @@ import { CATEGORIES, type Difficulty } from "../client/src/data/questions.ts";
 import { APPROVED_ZOOM_WADDA7_ASSETS } from "../client/src/data/zoom-wadda7-approved-assets.ts";
 
 type WorkflowCategory = "zoom" | "wadda7";
+type ReviewStatus = "approved" | "pending-review" | "needs-fixing";
+type SourceOrigin = "local" | "pollinations";
 
 type CropBox = {
   left: number;
@@ -16,10 +18,11 @@ type CropBox = {
 };
 
 type SourceEntry = {
-  source: string;
+  mappingId?: string;
+  source?: string;
+  prompt?: string;
   category: WorkflowCategory;
-  questionId?: string;
-  description?: string;
+  questionId: string;
   outputName?: string;
   reviewNotes?: string;
   zoom?: {
@@ -40,36 +43,42 @@ type ManifestOutput = {
 
 type ManifestEntry = {
   entryId: string;
+  mappingId: string;
   category: WorkflowCategory;
   mode: WorkflowCategory;
   sourceImage: string;
   sourceFilename: string;
+  sourceOrigin: SourceOrigin;
+  sourcePrompt: string | null;
   outputName: string;
-  questionId: string | null;
-  questionPrompt: string | null;
-  answerOrDescription: string | null;
-  pointTier: Difficulty | null;
+  questionId: string;
+  questionPrompt: string;
+  answerOrDescription: string;
+  pointTier: Difficulty;
   reviewNotes: string;
   outputs: ManifestOutput[];
   defaultZoomOutputLabel?: string;
+  reviewStatus: ReviewStatus;
+  validationErrors: string[];
 };
 
 type GeneratedManifest = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   generatedAt: string;
   entries: ManifestEntry[];
 };
 
 type ApprovalEntry = {
   entryId: string;
+  mappingId: string;
   category: WorkflowCategory;
-  questionId: string | null;
-  status: "pass" | "needs-fix";
+  questionId: string;
+  status: ReviewStatus;
   selectedOutputLabel?: string;
 };
 
 type ApprovalFile = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   savedAt: string;
   entries: ApprovalEntry[];
 };
@@ -82,6 +91,12 @@ type QuestionLookup = {
   category: WorkflowCategory;
 };
 
+type SourceResolution = {
+  sourceAbsolutePath: string;
+  sourceOrigin: SourceOrigin;
+  sourcePrompt: string | null;
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
@@ -92,11 +107,18 @@ const configPath = path.join(inputRoot, "source-images.json");
 const manifestPath = path.join(outputRoot, "zoom-wadda7.generated.json");
 const reviewHtmlPath = path.join(outputRoot, "zoom-wadda7-review.html");
 const approvalDraftPath = path.join(outputRoot, "zoom-wadda7.approved.json");
+const generatedSourceRoot = path.join(inputRoot, "generated-source-images");
 const appliedMappingPath = path.join(repoRoot, "client", "src", "data", "zoom-wadda7-approved-assets.ts");
 const publicImagesRoot = path.join(repoRoot, "client", "public", "images");
 const generatedZoomDir = path.join(publicImagesRoot, "generated", "zoom");
 const generatedWadda7Dir = path.join(publicImagesRoot, "generated", "wadda7");
+
 const force = process.argv.includes("--force");
+const dryRun = process.argv.includes("--dry-run");
+const pollinationsBaseUrl = getFlagValue("--pollinations-base-url=") ?? "https://image.pollinations.ai/prompt/";
+const MAX_SOURCE_IMAGE_REQUESTS_PER_RUN = 10;
+const POLLINATIONS_TIMEOUT_MS = 20_000;
+const POLLINATIONS_RETRY_ATTEMPTS = 3;
 
 const questionLookup = new Map<string, QuestionLookup>();
 
@@ -135,63 +157,217 @@ async function main(): Promise<void> {
       await applyApprovedMappings();
       return;
     default:
-      throw new Error("Usage: tsx scripts/zoom-wadda7-local-workflow.ts <generate|review|validate|apply> [--force]");
+      throw new Error(
+        "Usage: tsx scripts/zoom-wadda7-local-workflow.ts <generate|review|validate|apply> [--force] [--dry-run] [--pollinations-base-url=<url>]",
+      );
   }
 }
 
 async function generateAssets(): Promise<void> {
+  const config = loadSourceConfig();
+  const requestPlanCount = countPlannedSourceImageRequests(config.entries);
+  if (requestPlanCount > MAX_SOURCE_IMAGE_REQUESTS_PER_RUN) {
+    throw new Error(
+      `This run would require ${requestPlanCount} source-image requests, which exceeds the hard cap of ${MAX_SOURCE_IMAGE_REQUESTS_PER_RUN}. Split the run into smaller batches.`,
+    );
+  }
+
+  if (dryRun) {
+    printDryRunPlan(config.entries, requestPlanCount);
+    return;
+  }
+
+  ensureDir(generatedSourceRoot);
   ensureDir(generatedZoomDir);
   ensureDir(generatedWadda7Dir);
   ensureDir(outputRoot);
 
-  const config = loadSourceConfig();
+  const requestBudget = { used: 0 };
   const entries: ManifestEntry[] = [];
+  const failedEntryIds: string[] = [];
 
   for (const entry of config.entries) {
-    const resolvedSourcePath = resolveWorkflowPath(entry.source);
-    if (!fs.existsSync(resolvedSourcePath)) {
-      throw new Error(`Source image not found: ${entry.source}`);
-    }
-
     const question = resolveQuestion(entry);
-    const outputName = slugify(entry.outputName || question?.id || path.parse(resolvedSourcePath).name);
-    const entryId = `${entry.category}:${outputName}`;
+    const outputName = slugify(entry.outputName || question.id);
+    const mappingId = slugify(entry.mappingId || `${entry.category}-${question.id}-${outputName}`);
+    const entryId = `${entry.category}:${mappingId}`;
 
-    let outputs: ManifestOutput[];
-    let defaultZoomOutputLabel: string | undefined;
-
-    if (entry.category === "zoom") {
-      outputs = await generateZoomOutputs(entry, resolvedSourcePath, outputName);
-      defaultZoomOutputLabel = outputs[0]?.label;
-    } else {
-      outputs = await generateWadda7Outputs(resolvedSourcePath, outputName);
+    const manifestEntry = await buildManifestEntry(entry, question, outputName, mappingId, entryId, requestBudget);
+    if (manifestEntry.reviewStatus === "needs-fixing") {
+      failedEntryIds.push(entryId);
     }
-
-    entries.push({
-      entryId,
-      category: entry.category,
-      mode: entry.category,
-      sourceImage: toRepoRelative(resolvedSourcePath),
-      sourceFilename: path.basename(resolvedSourcePath),
-      outputName,
-      questionId: question?.id ?? null,
-      questionPrompt: question?.q ?? null,
-      answerOrDescription: question?.a ?? entry.description ?? null,
-      pointTier: question?.points ?? null,
-      reviewNotes: entry.reviewNotes ?? "",
-      outputs,
-      defaultZoomOutputLabel,
-    });
+    entries.push(manifestEntry);
   }
 
   const manifest: GeneratedManifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     entries,
   };
 
   writeJson(manifestPath, manifest);
   console.log(`Generated ${entries.length} manifest entries: ${toRepoRelative(manifestPath)}`);
+
+  if (failedEntryIds.length > 0) {
+    throw new Error(
+      `Generation completed with ${failedEntryIds.length} mapping(s) marked needs-fixing: ${failedEntryIds.join(", ")}. Review ${toRepoRelative(manifestPath)} for details.`,
+    );
+  }
+}
+
+async function buildManifestEntry(
+  entry: SourceEntry,
+  question: QuestionLookup,
+  outputName: string,
+  mappingId: string,
+  entryId: string,
+  requestBudget: { used: number },
+): Promise<ManifestEntry> {
+  const validationErrors: string[] = [];
+  const outputs: ManifestOutput[] = [];
+  let defaultZoomOutputLabel: string | undefined;
+  let sourceResolution: SourceResolution | null = null;
+
+  try {
+    sourceResolution = await resolveSourceImage(entry, outputName, requestBudget);
+    await validateAbsoluteImageFile(sourceResolution.sourceAbsolutePath, `Source image for ${entryId}`, validationErrors);
+
+    if (validationErrors.length === 0) {
+      if (entry.category === "zoom") {
+        const generated = await generateZoomOutputs(entry, sourceResolution.sourceAbsolutePath, outputName);
+        outputs.push(...generated);
+        defaultZoomOutputLabel = generated[0]?.label;
+      } else {
+        outputs.push(...(await generateWadda7Outputs(sourceResolution.sourceAbsolutePath, outputName)));
+      }
+    }
+  } catch (error) {
+    validationErrors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  const manifestEntry: ManifestEntry = {
+    entryId,
+    mappingId,
+    category: entry.category,
+    mode: question.category,
+    sourceImage: sourceResolution ? toRepoRelative(sourceResolution.sourceAbsolutePath) : "",
+    sourceFilename: sourceResolution ? path.basename(sourceResolution.sourceAbsolutePath) : "",
+    sourceOrigin: sourceResolution?.sourceOrigin ?? (entry.prompt ? "pollinations" : "local"),
+    sourcePrompt: sourceResolution?.sourcePrompt ?? entry.prompt?.trim() ?? null,
+    outputName,
+    questionId: question.id,
+    questionPrompt: question.q,
+    answerOrDescription: question.a,
+    pointTier: question.points,
+    reviewNotes: entry.reviewNotes ?? "",
+    outputs,
+    defaultZoomOutputLabel,
+    reviewStatus: "needs-fixing",
+    validationErrors,
+  };
+
+  await validateManifestEntry(manifestEntry, validationErrors);
+  manifestEntry.reviewStatus = validationErrors.length === 0 ? "pending-review" : "needs-fixing";
+  manifestEntry.validationErrors = dedupe(validationErrors);
+  return manifestEntry;
+}
+
+async function resolveSourceImage(
+  entry: SourceEntry,
+  outputName: string,
+  requestBudget: { used: number },
+): Promise<SourceResolution> {
+  if (entry.source) {
+    const sourceAbsolutePath = resolveWorkflowPath(entry.source);
+    if (!fs.existsSync(sourceAbsolutePath)) {
+      throw new Error(`Source image not found: ${entry.source}`);
+    }
+    return {
+      sourceAbsolutePath,
+      sourceOrigin: "local",
+      sourcePrompt: entry.prompt?.trim() || null,
+    };
+  }
+
+  const prompt = entry.prompt?.trim();
+  if (!prompt) {
+    throw new Error(`Entry ${entry.questionId} must provide either "source" or "prompt".`);
+  }
+
+  const sourceAbsolutePath = path.join(generatedSourceRoot, `${outputName}--source.jpg`);
+  if (!force && fs.existsSync(sourceAbsolutePath)) {
+    return {
+      sourceAbsolutePath,
+      sourceOrigin: "pollinations",
+      sourcePrompt: prompt,
+    };
+  }
+
+  await fetchPollinationsImage(prompt, sourceAbsolutePath, requestBudget);
+  return {
+    sourceAbsolutePath,
+    sourceOrigin: "pollinations",
+    sourcePrompt: prompt,
+  };
+}
+
+async function fetchPollinationsImage(prompt: string, targetPath: string, requestBudget: { used: number }): Promise<void> {
+  let lastError: string | null = null;
+
+  for (let attempt = 1; attempt <= POLLINATIONS_RETRY_ATTEMPTS; attempt += 1) {
+    if (requestBudget.used >= MAX_SOURCE_IMAGE_REQUESTS_PER_RUN) {
+      throw new Error(
+        `Pollinations request cap reached after ${requestBudget.used} request(s). The hard cap is ${MAX_SOURCE_IMAGE_REQUESTS_PER_RUN} per run.`,
+      );
+    }
+    requestBudget.used += 1;
+
+    try {
+      const response = await fetch(buildPollinationsUrl(prompt), {
+        method: "GET",
+        headers: { accept: "image/*" },
+        signal: AbortSignal.timeout(POLLINATIONS_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        const detail = truncateForError(await safeReadText(response));
+        throw new Error(`Pollinations returned HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+      }
+
+      const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+      if (!contentType.startsWith("image/")) {
+        const detail = truncateForError(await safeReadText(response));
+        throw new Error(
+          `Pollinations returned a non-image response (${contentType || "unknown content-type"})${detail ? `: ${detail}` : ""}`,
+        );
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.byteLength === 0) {
+        throw new Error("Pollinations returned an empty image response");
+      }
+
+      await validateImageBuffer(buffer, `Pollinations source image for prompt "${prompt}"`);
+      ensureDir(path.dirname(targetPath));
+      fs.writeFileSync(targetPath, buffer);
+      return;
+    } catch (error) {
+      lastError = normalizePollinationsError(error);
+      if (attempt === POLLINATIONS_RETRY_ATTEMPTS) {
+        break;
+      }
+    }
+  }
+
+  throw new Error(
+    `Pollinations source-image generation failed for "${prompt}" after ${POLLINATIONS_RETRY_ATTEMPTS} attempt(s): ${lastError ?? "unknown error"}`,
+  );
+}
+
+function buildPollinationsUrl(prompt: string): string {
+  const encodedPrompt = encodeURIComponent(prompt);
+  const base = pollinationsBaseUrl.endsWith("/") ? pollinationsBaseUrl : `${pollinationsBaseUrl}/`;
+  return `${base}${encodedPrompt}?width=1200&height=1200&model=flux&nologo=true&private=true&safe=true`;
 }
 
 async function renderReviewHtml(): Promise<void> {
@@ -206,7 +382,7 @@ async function renderReviewHtml(): Promise<void> {
   const cards = manifest.entries
     .map((entry) => {
       const approval = approvalByEntryId.get(entry.entryId);
-      const status = approval?.status ?? "needs-fix";
+      const status = approval?.status ?? entry.reviewStatus;
       const selectedOutputLabel = approval?.selectedOutputLabel ?? entry.defaultZoomOutputLabel ?? entry.outputs[0]?.label ?? "";
       const outputsHtml = entry.outputs
         .map((output) => {
@@ -228,26 +404,36 @@ async function renderReviewHtml(): Promise<void> {
         })
         .join("");
 
+      const validationHtml =
+        entry.validationErrors.length > 0
+          ? `<ul class="errors">${entry.validationErrors.map((error) => `<li>${escapeHtml(error)}</li>`).join("")}</ul>`
+          : `<p class="ok-note">Local checks passed. This entry is still pending manual review.</p>`;
+
       return `
-        <article class="card" data-entry-id="${escapeHtml(entry.entryId)}" data-category="${escapeHtml(entry.category)}" data-question-id="${escapeHtml(entry.questionId ?? "")}">
+        <article class="card" data-entry-id="${escapeHtml(entry.entryId)}" data-mapping-id="${escapeHtml(entry.mappingId)}" data-category="${escapeHtml(entry.category)}" data-question-id="${escapeHtml(entry.questionId)}" data-default-status="${escapeHtml(entry.reviewStatus)}">
           <header class="card-header">
             <div>
               <h2>${escapeHtml(entry.entryId)}</h2>
-              <p>${escapeHtml(entry.category)} · ${escapeHtml(entry.sourceFilename)}</p>
+              <p>${escapeHtml(entry.category)} · ${escapeHtml(entry.sourceFilename || "missing-source")}</p>
             </div>
             <div class="status-group">
-              <button type="button" class="status-button ${status === "pass" ? "active pass" : ""}" data-status="pass">Pass</button>
-              <button type="button" class="status-button ${status === "needs-fix" ? "active needs-fix" : ""}" data-status="needs-fix">Needs-fix</button>
+              <button type="button" class="status-button ${status === "approved" ? "active approved" : ""}" data-status="approved">Approved</button>
+              <button type="button" class="status-button ${status === "pending-review" ? "active pending-review" : ""}" data-status="pending-review">Pending-review</button>
+              <button type="button" class="status-button ${status === "needs-fixing" ? "active needs-fixing" : ""}" data-status="needs-fixing">Needs-fixing</button>
             </div>
           </header>
           <dl class="meta-grid">
-            <div><dt>Question ID</dt><dd>${escapeHtml(entry.questionId ?? "—")}</dd></div>
-            <div><dt>Points</dt><dd>${escapeHtml(String(entry.pointTier ?? "—"))}</dd></div>
-            <div><dt>Prompt</dt><dd>${escapeHtml(entry.questionPrompt ?? "—")}</dd></div>
-            <div><dt>Answer / description</dt><dd>${escapeHtml(entry.answerOrDescription ?? "—")}</dd></div>
-            <div><dt>Source</dt><dd>${escapeHtml(entry.sourceImage)}</dd></div>
+            <div><dt>Mapping ID</dt><dd>${escapeHtml(entry.mappingId)}</dd></div>
+            <div><dt>Question ID</dt><dd>${escapeHtml(entry.questionId)}</dd></div>
+            <div><dt>Points</dt><dd>${escapeHtml(String(entry.pointTier))}</dd></div>
+            <div><dt>Prompt</dt><dd>${escapeHtml(entry.questionPrompt)}</dd></div>
+            <div><dt>Answer</dt><dd>${escapeHtml(entry.answerOrDescription)}</dd></div>
+            <div><dt>Source origin</dt><dd>${escapeHtml(entry.sourceOrigin)}</dd></div>
+            <div><dt>Source prompt</dt><dd>${escapeHtml(entry.sourcePrompt ?? "—")}</dd></div>
+            <div><dt>Source</dt><dd>${escapeHtml(entry.sourceImage || "—")}</dd></div>
             <div><dt>Notes</dt><dd>${escapeHtml(entry.reviewNotes || "—")}</dd></div>
           </dl>
+          ${validationHtml}
           <section class="outputs">${outputsHtml}</section>
         </article>
       `;
@@ -266,7 +452,7 @@ async function renderReviewHtml(): Promise<void> {
       .toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 16px 20px; background: rgba(15, 23, 42, 0.95); border-bottom: 1px solid rgba(148, 163, 184, 0.25); }
       .toolbar button { border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
       .toolbar .download { background: #22c55e; color: #052e16; }
-      .toolbar .summary { color: #cbd5e1; font-size: 14px; }
+      .toolbar .summary { color: #cbd5e1; font-size: 14px; white-space: pre-line; }
       main { padding: 20px; display: grid; gap: 16px; }
       .card { background: #111827; border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 20px; padding: 16px; display: grid; gap: 16px; }
       .card-header { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; }
@@ -274,8 +460,9 @@ async function renderReviewHtml(): Promise<void> {
       .card-header p { margin: 0; color: #94a3b8; }
       .status-group { display: flex; gap: 8px; flex-wrap: wrap; }
       .status-button { border: 1px solid rgba(148, 163, 184, 0.35); background: transparent; color: inherit; border-radius: 999px; padding: 8px 14px; font-weight: 700; cursor: pointer; }
-      .status-button.active.pass { background: #22c55e; color: #052e16; border-color: #22c55e; }
-      .status-button.active.needs-fix { background: #f97316; color: #431407; border-color: #f97316; }
+      .status-button.active.approved { background: #22c55e; color: #052e16; border-color: #22c55e; }
+      .status-button.active.pending-review { background: #facc15; color: #422006; border-color: #facc15; }
+      .status-button.active.needs-fixing { background: #f97316; color: #431407; border-color: #f97316; }
       .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0; }
       .meta-grid dt { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 4px; }
       .meta-grid dd { margin: 0; white-space: pre-wrap; }
@@ -285,6 +472,8 @@ async function renderReviewHtml(): Promise<void> {
       .output-meta { display: grid; gap: 8px; font-size: 13px; }
       .output-choice, .stage-pill { display: inline-flex; align-items: center; gap: 6px; }
       .stage-pill { font-weight: 700; color: #bfdbfe; }
+      .errors { margin: 0; padding-left: 20px; color: #fdba74; }
+      .ok-note { margin: 0; color: #bfdbfe; }
       @media (max-width: 640px) {
         .toolbar, .card-header { flex-direction: column; align-items: stretch; }
       }
@@ -319,13 +508,14 @@ async function renderReviewHtml(): Promise<void> {
         } catch {}
       }
 
-      const ensureState = (entryId, category, questionId, fallbackOutputLabel) => {
+      const ensureState = (entryId, mappingId, category, questionId, defaultStatus, fallbackOutputLabel) => {
         if (!state.has(entryId)) {
           state.set(entryId, {
             entryId,
+            mappingId,
             category,
-            questionId: questionId || null,
-            status: "needs-fix",
+            questionId,
+            status: defaultStatus || "pending-review",
             selectedOutputLabel: fallbackOutputLabel || undefined
           });
         }
@@ -334,10 +524,13 @@ async function renderReviewHtml(): Promise<void> {
 
       const syncSummary = () => {
         const values = Array.from(state.values());
-        const passed = values.filter((entry) => entry.status === "pass").length;
-        document.getElementById("summary").textContent = passed + " passed / " + manifest.entries.length + " total";
+        const approved = values.filter((entry) => entry.status === "approved").length;
+        const pending = values.filter((entry) => entry.status === "pending-review").length;
+        const needsFixing = values.filter((entry) => entry.status === "needs-fixing").length;
+        document.getElementById("summary").textContent =
+          approved + " approved / " + pending + " pending-review / " + needsFixing + " needs-fixing / " + manifest.entries.length + " total";
         window.localStorage.setItem(storageKey, JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           savedAt: new Date().toISOString(),
           entries: values
         }));
@@ -345,10 +538,12 @@ async function renderReviewHtml(): Promise<void> {
 
       document.querySelectorAll(".card").forEach((card) => {
         const entryId = card.dataset.entryId;
+        const mappingId = card.dataset.mappingId;
         const category = card.dataset.category;
         const questionId = card.dataset.questionId;
+        const defaultStatus = card.dataset.defaultStatus;
         const fallbackOutputLabel = card.querySelector('input[type="radio"]')?.value;
-        const entryState = ensureState(entryId, category, questionId, fallbackOutputLabel);
+        const entryState = ensureState(entryId, mappingId, category, questionId, defaultStatus, fallbackOutputLabel);
 
         card.querySelectorAll(".status-button").forEach((button) => {
           if (button.dataset.status === entryState.status) {
@@ -357,7 +552,7 @@ async function renderReviewHtml(): Promise<void> {
           button.addEventListener("click", () => {
             entryState.status = button.dataset.status;
             card.querySelectorAll(".status-button").forEach((candidate) => {
-              candidate.classList.remove("active", "pass", "needs-fix");
+              candidate.classList.remove("active", "approved", "pending-review", "needs-fixing");
             });
             button.classList.add("active", entryState.status);
             syncSummary();
@@ -379,12 +574,13 @@ async function renderReviewHtml(): Promise<void> {
 
       document.getElementById("download-approvals").addEventListener("click", () => {
         const payload = {
-          schemaVersion: 1,
+          schemaVersion: 2,
           savedAt: new Date().toISOString(),
           entries: manifest.entries.map((entry) => {
-            const current = ensureState(entry.entryId, entry.category, entry.questionId, entry.defaultZoomOutputLabel || entry.outputs[0]?.label);
+            const current = ensureState(entry.entryId, entry.mappingId, entry.category, entry.questionId, entry.reviewStatus, entry.defaultZoomOutputLabel || entry.outputs[0]?.label);
             return {
               entryId: entry.entryId,
+              mappingId: entry.mappingId,
               category: entry.category,
               questionId: entry.questionId,
               status: current.status,
@@ -411,6 +607,11 @@ async function renderReviewHtml(): Promise<void> {
 async function validateAppliedAndDraftMappings(): Promise<void> {
   const errors: string[] = [];
 
+  const manifest = loadManifest();
+  for (const entry of manifest.entries) {
+    await validateManifestEntry(entry, errors);
+  }
+
   for (const [questionId, asset] of Object.entries(APPROVED_ZOOM_WADDA7_ASSETS)) {
     const question = questionLookup.get(questionId);
     if (!question) {
@@ -420,24 +621,35 @@ async function validateAppliedAndDraftMappings(): Promise<void> {
     if (question.category !== asset.category) {
       errors.push(`Applied mapping category mismatch for ${questionId}: expected ${question.category}, got ${asset.category}`);
     }
+    if (question.q !== asset.questionPrompt) {
+      errors.push(`Applied mapping prompt mismatch for ${questionId}`);
+    }
+    if (question.a !== asset.answerOrDescription) {
+      errors.push(`Applied mapping answer mismatch for ${questionId}`);
+    }
+    if (question.points !== asset.pointTier) {
+      errors.push(`Applied mapping points mismatch for ${questionId}: expected ${question.points}, got ${asset.pointTier}`);
+    }
+    await validateRepoRelativeImagePath(asset.sourceImage, `Applied source image ${questionId}`, errors);
     if (asset.category === "zoom") {
-      validateImagePath(asset.image, `Applied zoom asset ${questionId}`, errors);
+      await validateImagePath(asset.image, `Applied zoom asset ${questionId}`, errors);
     } else {
       if (asset.stages.length !== 3) {
         errors.push(`Applied wadda7 mapping ${questionId} must contain exactly 3 stages`);
       }
-      asset.stages.forEach((stagePath, index) => validateImagePath(stagePath, `Applied wadda7 asset ${questionId} stage ${index}`, errors));
+      for (const [index, stagePath] of asset.stages.entries()) {
+        await validateImagePath(stagePath, `Applied wadda7 asset ${questionId} stage ${index}`, errors);
+      }
     }
   }
 
   if (fs.existsSync(approvalDraftPath)) {
-    const manifest = loadManifest();
     const approvals = loadApprovalDraft(true);
-    validateApprovalDraft(manifest, approvals, errors);
+    await validateApprovalDraft(manifest, approvals, errors);
   }
 
   if (errors.length > 0) {
-    throw new Error(`Validation failed:\n- ${errors.join("\n- ")}`);
+    throw new Error(`Validation failed:\n- ${dedupe(errors).join("\n- ")}`);
   }
 
   console.log("Zoom/Wadda7 validation passed");
@@ -447,19 +659,19 @@ async function applyApprovedMappings(): Promise<void> {
   const manifest = loadManifest();
   const approvals = loadApprovalDraft(true);
   const errors: string[] = [];
-  validateApprovalDraft(manifest, approvals, errors);
+  await validateApprovalDraft(manifest, approvals, errors);
 
   if (errors.length > 0) {
-    throw new Error(`Cannot apply approvals:\n- ${errors.join("\n- ")}`);
+    throw new Error(`Cannot apply approvals:\n- ${dedupe(errors).join("\n- ")}`);
   }
 
   const manifestByEntryId = new Map(manifest.entries.map((entry) => [entry.entryId, entry]));
   const approvedQuestionIds = new Set<string>();
   const mappings = approvals.entries
-    .filter((entry) => entry.status === "pass")
+    .filter((entry) => entry.status === "approved")
     .map((approval) => {
       const manifestEntry = manifestByEntryId.get(approval.entryId)!;
-      const questionId = manifestEntry.questionId!;
+      const questionId = manifestEntry.questionId;
       if (approvedQuestionIds.has(questionId)) {
         throw new Error(`More than one approved mapping targets ${questionId}`);
       }
@@ -471,15 +683,18 @@ async function applyApprovedMappings(): Promise<void> {
         if (!selectedOutput) {
           throw new Error(`Approved zoom mapping ${manifestEntry.entryId} references missing output label ${selectedLabel}`);
         }
-        return [questionId, {
-          category: "zoom",
-          sourceImage: manifestEntry.sourceImage,
+        return [
           questionId,
-          questionPrompt: manifestEntry.questionPrompt!,
-          answerOrDescription: manifestEntry.answerOrDescription!,
-          pointTier: manifestEntry.pointTier!,
-          image: toPublicRelative(selectedOutput.relativePath),
-        }] as const;
+          {
+            category: "zoom",
+            sourceImage: manifestEntry.sourceImage,
+            questionId,
+            questionPrompt: manifestEntry.questionPrompt,
+            answerOrDescription: manifestEntry.answerOrDescription,
+            pointTier: manifestEntry.pointTier,
+            image: toPublicRelative(selectedOutput.relativePath),
+          },
+        ] as const;
       }
 
       const orderedStages = ["stage-600", "stage-400", "stage-200"].map((label) => {
@@ -490,15 +705,18 @@ async function applyApprovedMappings(): Promise<void> {
         return toPublicRelative(output.relativePath);
       }) as [string, string, string];
 
-      return [questionId, {
-        category: "wadda7",
-        sourceImage: manifestEntry.sourceImage,
+      return [
         questionId,
-        questionPrompt: manifestEntry.questionPrompt!,
-        answerOrDescription: manifestEntry.answerOrDescription!,
-        pointTier: manifestEntry.pointTier!,
-        stages: orderedStages,
-      }] as const;
+        {
+          category: "wadda7",
+          sourceImage: manifestEntry.sourceImage,
+          questionId,
+          questionPrompt: manifestEntry.questionPrompt,
+          answerOrDescription: manifestEntry.answerOrDescription,
+          pointTier: manifestEntry.pointTier,
+          stages: orderedStages,
+        },
+      ] as const;
     })
     .sort(([left], [right]) => left.localeCompare(right, "en"));
 
@@ -535,20 +753,39 @@ export function getApprovedZoomWadda7Asset(questionId: string): ApprovedZoomWadd
   console.log(`Applied ${mappings.length} approved mappings to ${toRepoRelative(appliedMappingPath)}`);
 }
 
-function validateApprovalDraft(manifest: GeneratedManifest, approvals: ApprovalFile, errors: string[]): void {
+async function validateApprovalDraft(manifest: GeneratedManifest, approvals: ApprovalFile, errors: string[]): Promise<void> {
   const manifestByEntryId = new Map(manifest.entries.map((entry) => [entry.entryId, entry]));
   const approvedQuestionIds = new Set<string>();
 
-  for (const approval of approvals.entries.filter((entry) => entry.status === "pass")) {
+  for (const approval of approvals.entries) {
+    if (!approval.entryId || !approval.mappingId || !approval.questionId) {
+      errors.push(`Approval entries must include entryId, mappingId, and questionId`);
+      continue;
+    }
+    if (!["approved", "pending-review", "needs-fixing"].includes(approval.status)) {
+      errors.push(`Approval ${approval.entryId} has invalid status ${approval.status}`);
+      continue;
+    }
+
+    if (approval.status !== "approved") {
+      continue;
+    }
+
     const manifestEntry = manifestByEntryId.get(approval.entryId);
     if (!manifestEntry) {
       errors.push(`Approval references missing manifest entry: ${approval.entryId}`);
       continue;
     }
-    if (!manifestEntry.questionId) {
-      errors.push(`Approved entry ${approval.entryId} does not have a question ID`);
-      continue;
+    if (manifestEntry.mappingId !== approval.mappingId) {
+      errors.push(`Approval mappingId mismatch for ${approval.entryId}: expected ${manifestEntry.mappingId}, got ${approval.mappingId}`);
     }
+    if (manifestEntry.questionId !== approval.questionId) {
+      errors.push(`Approval questionId mismatch for ${approval.entryId}: expected ${manifestEntry.questionId}, got ${approval.questionId}`);
+    }
+    if (manifestEntry.validationErrors.length > 0) {
+      errors.push(`Approved entry ${approval.entryId} still has local validation errors`);
+    }
+
     const question = questionLookup.get(manifestEntry.questionId);
     if (!question) {
       errors.push(`Approved entry ${approval.entryId} references nonexistent question ID ${manifestEntry.questionId}`);
@@ -568,7 +805,7 @@ function validateApprovalDraft(manifest: GeneratedManifest, approvals: ApprovalF
       if (!selectedOutput) {
         errors.push(`Approved zoom entry ${approval.entryId} uses a missing crop label: ${selectedLabel}`);
       } else {
-        validateImagePath(toPublicRelative(selectedOutput.relativePath), `Approved zoom entry ${approval.entryId}`, errors);
+        await validateImagePath(toPublicRelative(selectedOutput.relativePath), `Approved zoom entry ${approval.entryId}`, errors);
       }
     } else {
       for (const label of ["stage-600", "stage-400", "stage-200"]) {
@@ -577,20 +814,119 @@ function validateApprovalDraft(manifest: GeneratedManifest, approvals: ApprovalF
           errors.push(`Approved wadda7 entry ${approval.entryId} is missing ${label}`);
           continue;
         }
-        validateImagePath(toPublicRelative(stage.relativePath), `Approved wadda7 entry ${approval.entryId} ${label}`, errors);
+        await validateImagePath(toPublicRelative(stage.relativePath), `Approved wadda7 entry ${approval.entryId} ${label}`, errors);
       }
     }
   }
 }
 
-function validateImagePath(publicRelativePath: string, label: string, errors: string[]): void {
+async function validateManifestEntry(entry: ManifestEntry, errors: string[]): Promise<void> {
+  if (!entry.entryId) {
+    errors.push("Manifest entry is missing entryId");
+  }
+  if (!entry.mappingId) {
+    errors.push(`Manifest entry ${entry.entryId || "(unknown)"} is missing mappingId`);
+  }
+  const question = questionLookup.get(entry.questionId);
+  if (!question) {
+    errors.push(`Manifest entry ${entry.entryId} references missing question ID ${entry.questionId}`);
+    return;
+  }
+  if (entry.mode !== question.category) {
+    errors.push(`Manifest entry ${entry.entryId} mode mismatch: expected ${question.category}, got ${entry.mode}`);
+  }
+  if (entry.category !== question.category) {
+    errors.push(`Manifest entry ${entry.entryId} category mismatch: expected ${question.category}, got ${entry.category}`);
+  }
+  if (entry.questionPrompt !== question.q) {
+    errors.push(`Manifest entry ${entry.entryId} prompt mismatch for ${entry.questionId}`);
+  }
+  if (entry.answerOrDescription !== question.a) {
+    errors.push(`Manifest entry ${entry.entryId} answer mismatch for ${entry.questionId}`);
+  }
+  if (entry.pointTier !== question.points) {
+    errors.push(`Manifest entry ${entry.entryId} points mismatch: expected ${question.points}, got ${entry.pointTier}`);
+  }
+  if (!entry.sourceImage) {
+    errors.push(`Manifest entry ${entry.entryId} is missing sourceImage`);
+  } else {
+    await validateRepoRelativeImagePath(entry.sourceImage, `Manifest source image ${entry.entryId}`, errors);
+  }
+
+  if (entry.category === "zoom") {
+    const expectedLabels = ["close-1", "close-2", "close-3"];
+    for (const label of expectedLabels) {
+      const output = entry.outputs.find((candidate) => candidate.label === label);
+      if (!output) {
+        errors.push(`Manifest zoom entry ${entry.entryId} is missing ${label}`);
+        continue;
+      }
+      await validateRepoRelativeImagePath(output.relativePath, `Manifest zoom entry ${entry.entryId} ${label}`, errors);
+    }
+  } else {
+    const expectedLabels = ["stage-600", "stage-400", "stage-200"];
+    for (const label of expectedLabels) {
+      const output = entry.outputs.find((candidate) => candidate.label === label);
+      if (!output) {
+        errors.push(`Manifest wadda7 entry ${entry.entryId} is missing ${label}`);
+        continue;
+      }
+      await validateRepoRelativeImagePath(output.relativePath, `Manifest wadda7 entry ${entry.entryId} ${label}`, errors);
+    }
+  }
+
+  if (entry.reviewStatus === "approved") {
+    errors.push(`Manifest entry ${entry.entryId} must not be auto-approved; use pending-review until manual review is completed`);
+  }
+}
+
+async function validateImagePath(publicRelativePath: string, label: string, errors: string[]): Promise<void> {
   if (!publicRelativePath.startsWith("./images/")) {
     errors.push(`${label} must stay under ./images/, got ${publicRelativePath}`);
     return;
   }
   const absolutePath = path.join(publicImagesRoot, publicRelativePath.replace("./images/", ""));
+  await validateAbsoluteImageFile(absolutePath, `${label} (${publicRelativePath})`, errors);
+}
+
+async function validateRepoRelativeImagePath(repoRelativePath: string, label: string, errors: string[]): Promise<void> {
+  if (!repoRelativePath) {
+    errors.push(`${label} is missing`);
+    return;
+  }
+  const absolutePath = path.join(repoRoot, repoRelativePath);
+  await validateAbsoluteImageFile(absolutePath, `${label} (${repoRelativePath})`, errors);
+}
+
+async function validateAbsoluteImageFile(absolutePath: string, label: string, errors: string[]): Promise<void> {
   if (!fs.existsSync(absolutePath)) {
-    errors.push(`${label} points at a missing image: ${publicRelativePath}`);
+    errors.push(`${label} points at a missing image`);
+    return;
+  }
+
+  const stat = fs.statSync(absolutePath);
+  if (stat.size === 0) {
+    errors.push(`${label} is empty`);
+    return;
+  }
+
+  try {
+    const metadata = await sharp(absolutePath).metadata();
+    if (!metadata.width || !metadata.height) {
+      errors.push(`${label} has invalid image metadata`);
+    }
+  } catch (error) {
+    errors.push(`${label} is not a valid image: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+async function validateImageBuffer(buffer: Buffer, label: string): Promise<void> {
+  if (buffer.byteLength === 0) {
+    throw new Error(`${label} is empty`);
+  }
+  const metadata = await sharp(buffer).metadata();
+  if (!metadata.width || !metadata.height) {
+    throw new Error(`${label} has invalid image metadata`);
   }
 }
 
@@ -598,7 +934,7 @@ async function generateZoomOutputs(entry: SourceEntry, sourcePath: string, outpu
   const image = sharp(sourcePath).rotate();
   const metadata = await image.metadata();
   if (!metadata.width || !metadata.height) {
-    throw new Error(`Could not read dimensions for ${entry.source}`);
+    throw new Error(`Could not read dimensions for ${toRepoRelative(sourcePath)}`);
   }
 
   const crops = buildZoomCrops(metadata.width, metadata.height, entry.zoom?.manualCrop);
@@ -635,7 +971,7 @@ async function generateWadda7Outputs(sourcePath: string, outputName: string): Pr
 
   const metadata = await sharp(baseBuffer).metadata();
   if (!metadata.width || !metadata.height) {
-    throw new Error(`Could not derive resized dimensions for ${sourcePath}`);
+    throw new Error(`Could not derive resized dimensions for ${toRepoRelative(sourcePath)}`);
   }
 
   const variants: Array<{ label: "stage-600" | "stage-400" | "stage-200"; pixelateTo?: number; blur?: number }> = [
@@ -702,8 +1038,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function resolveQuestion(entry: SourceEntry): QuestionLookup | null {
-  if (!entry.questionId) return null;
+function resolveQuestion(entry: SourceEntry): QuestionLookup {
   const question = questionLookup.get(entry.questionId);
   if (!question) {
     throw new Error(`Unknown question ID: ${entry.questionId}`);
@@ -722,6 +1057,17 @@ function loadSourceConfig(): SourceConfig {
   if (!Array.isArray(config.entries) || config.entries.length === 0) {
     throw new Error("source-images.json must contain a non-empty entries array");
   }
+  for (const [index, entry] of config.entries.entries()) {
+    if (!entry.questionId) {
+      throw new Error(`source-images.json entry ${index} is missing questionId`);
+    }
+    if (!entry.category || (entry.category !== "zoom" && entry.category !== "wadda7")) {
+      throw new Error(`source-images.json entry ${index} must use category "zoom" or "wadda7"`);
+    }
+    if ((entry.source ? 1 : 0) + (entry.prompt ? 1 : 0) !== 1) {
+      throw new Error(`source-images.json entry ${index} must include exactly one of "source" or "prompt"`);
+    }
+  }
   return config;
 }
 
@@ -737,7 +1083,7 @@ function loadApprovalDraft(required: boolean): ApprovalFile {
     if (required) {
       throw new Error(`Save the downloaded approval file to ${toRepoRelative(approvalDraftPath)} before applying.`);
     }
-    return { schemaVersion: 1, savedAt: new Date(0).toISOString(), entries: [] };
+    return { schemaVersion: 2, savedAt: new Date(0).toISOString(), entries: [] };
   }
   return JSON.parse(fs.readFileSync(approvalDraftPath, "utf8")) as ApprovalFile;
 }
@@ -786,4 +1132,86 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getFlagValue(prefix: string): string | null {
+  const arg = process.argv.find((candidate) => candidate.startsWith(prefix));
+  return arg ? arg.slice(prefix.length) : null;
+}
+
+function countPlannedSourceImageRequests(entries: SourceEntry[]): number {
+  return entries.filter((entry) => {
+    if (!entry.prompt) return false;
+    const question = resolveQuestion(entry);
+    const outputName = slugify(entry.outputName || question.id);
+    const sourceAbsolutePath = path.join(generatedSourceRoot, `${outputName}--source.jpg`);
+    return force || !fs.existsSync(sourceAbsolutePath);
+  }).length;
+}
+
+function printDryRunPlan(entries: SourceEntry[], requestPlanCount: number): void {
+  const plan = entries.map((entry) => {
+    const question = resolveQuestion(entry);
+    const outputName = slugify(entry.outputName || question.id);
+    const sourceAbsolutePath = entry.source
+      ? resolveWorkflowPath(entry.source)
+      : path.join(generatedSourceRoot, `${outputName}--source.jpg`);
+    return {
+      mappingId: slugify(entry.mappingId || `${entry.category}-${question.id}-${outputName}`),
+      mode: entry.category,
+      questionId: question.id,
+      promptFromSeed: question.q,
+      answerFromSeed: question.a,
+      pointsFromSeed: question.points,
+      sourceOrigin: entry.source ? "local" : "pollinations",
+      sourceImage: toRepoRelative(sourceAbsolutePath),
+      sourcePrompt: entry.prompt ?? null,
+      wouldFetchPollinations: !entry.source && (force || !fs.existsSync(sourceAbsolutePath)),
+      outputs:
+        entry.category === "zoom"
+          ? ["close-1", "close-2", "close-3"].map((label) => `client/public/images/generated/zoom/${outputName}--${label}.jpg`)
+          : ["stage-600", "stage-400", "stage-200"].map((label) => `client/public/images/generated/wadda7/${outputName}--${label}.jpg`),
+    };
+  });
+
+  console.log(
+    JSON.stringify(
+      {
+        dryRun: true,
+        networkUsed: false,
+        filesWritten: false,
+        plannedSourceImageRequests: requestPlanCount,
+        hardCap: MAX_SOURCE_IMAGE_REQUESTS_PER_RUN,
+        entries: plan,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function safeReadText(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
+function truncateForError(value: string): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, 180);
+}
+
+function normalizePollinationsError(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      return `request timed out after ${POLLINATIONS_TIMEOUT_MS}ms`;
+    }
+    return error.message;
+  }
+  return String(error);
+}
+
+function dedupe(values: string[]): string[] {
+  return [...new Set(values)];
 }

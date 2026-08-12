@@ -1,11 +1,12 @@
 {
   "entries": [
     {
-      "source": "input/images/example-zoom.jpg",
+      "mappingId": "zoom-bike-handlebar",
       "category": "zoom",
-      "questionId": "zoom-1",
-      "outputName": "example-zoom",
-      "reviewNotes": "Optional note shown in the gallery",
+      "questionId": "zoom-25",
+      "prompt": "Macro product photo of a bicycle handlebar grip, realistic lighting, centered subject, crisp detail",
+      "outputName": "example-zoom-bike",
+      "reviewNotes": "Optional note shown in the gallery. Generated source images stay in ignored local folders.",
       "zoom": {
         "manualCrop": {
           "left": 120,
@@ -16,10 +17,11 @@
       }
     },
     {
+      "mappingId": "wadda7-hot-air-balloon",
       "source": "input/images/example-wadda7.jpg",
       "category": "wadda7",
-      "questionId": "wadda7-20",
-      "outputName": "example-wadda7"
+      "questionId": "wadda7-32",
+      "outputName": "example-wadda7-balloon"
     }
   ]
 }
