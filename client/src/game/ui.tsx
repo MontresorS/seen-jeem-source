@@ -19,7 +19,6 @@ export function Logo({ className }: { className?: string }) {
       <img
         src="/seen-jeem-logo-new.png"
         alt="شعار الذئب الخاص بسين وجيم"
-        style={{ objectFit: "contain" }}
         className="h-24 w-24 shrink-0 object-contain drop-shadow-lg sm:h-32 sm:w-32 lg:h-36 lg:w-36"
       />
       <span className="flex flex-col items-end leading-none text-right">
