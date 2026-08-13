@@ -38,7 +38,7 @@ export default function Results() {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-3 text-center sm:pt-4">
       <header className="flex justify-center">
-        <Logo />
+        <Logo className="justify-center [&>img]:mr-0 sm:[&>img]:mr-0 lg:[&>img]:mr-0" />
       </header>
 
       <div className="sj-pop -mt-4 sm:-mt-6 lg:-mt-8 rounded-3xl border-2 border-card-border bg-card p-6 sj-shadow-lg sm:p-10">
