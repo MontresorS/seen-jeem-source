@@ -36,8 +36,8 @@ export default function Results() {
   }, [tie]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 text-center sm:pt-10">
-      <header className="mb-8 flex justify-center">
+    <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-3 text-center sm:pt-4">
+      <header className="mb-4 flex justify-center">
         <Logo />
       </header>
 

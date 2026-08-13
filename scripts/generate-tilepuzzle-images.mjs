@@ -36,8 +36,8 @@ const MODEL = 'flux'; // Pollinations default high-quality model
 const ROUNDS = [
   // ── 200-point tier (17 rounds) ──────────────────────────────────────────────
   {
-    id: 'tilepuzzle-01', points: 200, arabicAnswer: 'أديداس',
-    prompt: 'Three bold black parallel diagonal stripes on a white athletic sneaker shoe, premium playful quiz-game illustration, centered subject, vibrant rich background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-01', points: 200, arabicAnswer: 'أسد',
+    prompt: 'Majestic lion face with full golden mane, amber eyes, centered on warm golden savanna background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-02', points: 200, arabicAnswer: 'أندرويد',
@@ -84,20 +84,20 @@ const ROUNDS = [
     prompt: 'Crispy golden fried chicken pieces in red striped bucket, centered, premium playful quiz-game illustration, vibrant background, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-13', points: 200, arabicAnswer: 'ماستركارد',
-    prompt: 'Two overlapping circles one orange one red symbolizing payment card network, centered, premium playful quiz-game illustration, deep blue background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-13', points: 200, arabicAnswer: 'زهرة عباد الشمس',
+    prompt: 'Large vibrant sunflower with bright yellow petals and detailed brown seed center, centered on clear blue sky background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-14', points: 200, arabicAnswer: 'ماكدونالدز',
-    prompt: 'Golden yellow M-shaped arches with french fries and burger, centered, premium playful quiz-game illustration, red background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-14', points: 200, arabicAnswer: 'بطاطس مقلية',
+    prompt: 'Golden crispy french fries sticking out of a plain red paper cup, centered on warm background, premium playful quiz-game illustration, no text no letters no logos no watermarks no brand marks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-15', points: 200, arabicAnswer: 'نتفليكس',
     prompt: 'Red cinema screen with dramatic red curtains and film reel streaming setup, centered, premium playful quiz-game illustration, dark background, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-16', points: 200, arabicAnswer: 'نايكي',
-    prompt: 'White athletic running sneaker with bold curved swoosh checkmark, centered, premium playful quiz-game illustration, vivid background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-16', points: 200, arabicAnswer: 'كرة سلة',
+    prompt: 'Classic orange basketball with black seam curves, centered on hardwood court background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-17', points: 200, arabicAnswer: 'بلايستيشن',
@@ -118,12 +118,12 @@ const ROUNDS = [
     prompt: 'Yellow and red scallop seashell on white background at a petrol station, centered, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-21', points: 400, arabicAnswer: 'سبوتيفاي',
-    prompt: 'Green circle with curved white sound wave music streaming lines, centered, premium playful quiz-game illustration, dark background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-21', points: 400, arabicAnswer: 'سماعات رأس',
+    prompt: 'Stylish over-ear headphones in vibrant green color with curved headband, centered on dark background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-22', points: 400, arabicAnswer: 'ستاربكس',
-    prompt: 'Green mermaid siren figure holding two fish tails surrounded by stars, centered, premium playful quiz-game illustration, deep green background, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-22', points: 400, arabicAnswer: 'دلفين',
+    prompt: 'Playful bottlenose dolphin leaping over ocean waves with water splashing, centered on vivid blue ocean background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-23', points: 400, arabicAnswer: 'تليجرام',
@@ -134,8 +134,8 @@ const ROUNDS = [
     prompt: 'Silhouette of person dancing with musical notes and phone showing vertical video, centered, premium playful quiz-game illustration, black background with neon accents, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-25', points: 400, arabicAnswer: 'تويوتا',
-    prompt: 'Reliable Japanese family car with three overlapping oval ring ornaments on hood, centered, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-25', points: 400, arabicAnswer: 'جيب صحراوي',
+    prompt: 'Rugged off-road desert jeep SUV driving through sand dunes, centered, premium playful quiz-game illustration, warm sandy background, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-26', points: 400, arabicAnswer: 'فيزا',
@@ -150,8 +150,8 @@ const ROUNDS = [
     prompt: 'Green speech bubble with phone handset inside on white background, centered, premium playful quiz-game illustration, green background, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
-    id: 'tilepuzzle-29', points: 400, arabicAnswer: 'إكس (تويتر)',
-    prompt: 'Bold black X letter centered on white background with social media bird silhouettes, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
+    id: 'tilepuzzle-29', points: 400, arabicAnswer: 'عصفور',
+    prompt: 'Cheerful blue songbird perched on branch with colorful feathers, centered on sky background, premium playful quiz-game illustration, no text no letters no logos no watermarks, square 1024x1024',
   },
   {
     id: 'tilepuzzle-30', points: 400, arabicAnswer: 'يوتيوب',

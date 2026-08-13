@@ -41,8 +41,8 @@ export default function Setup() {
   const usedTotal = totalQuestions - totalRemaining;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:pt-8 2xl:max-w-[1700px] 2xl:px-10">
-      <header className="mb-6 flex flex-col items-center gap-3">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-3 sm:pt-4 2xl:max-w-[1700px] 2xl:px-10">
+      <header className="mb-3 flex flex-col gap-2">
         <Logo />
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
           <span
@@ -58,7 +58,7 @@ export default function Setup() {
         </div>
       </header>
 
-      <div className="sj-fade-up mb-7 rounded-3xl border-2 border-card-border bg-card p-5 sj-shadow sm:p-7">
+      <div className="sj-fade-up mb-4 rounded-3xl border-2 border-card-border bg-card p-5 sj-shadow sm:p-7">
         <div className="mb-1 flex flex-col items-center gap-2">
           <h1
             className="text-center text-xl font-black sm:text-2xl 2xl:text-4xl"

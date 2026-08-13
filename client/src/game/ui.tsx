@@ -15,22 +15,20 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("relative w-full min-h-[11rem] sm:min-h-[14rem] lg:min-h-[16rem]", className)}>
-      <span className="absolute right-0 top-0 flex flex-col leading-none text-right">
+    <div className={cn("flex w-full items-center justify-between gap-3 sm:gap-4", className)}>
+      <img
+        src="/seen-jeem-logo-new.png"
+        alt="شعار الذئب الخاص بسين وجيم"
+        style={{ objectFit: "contain" }}
+        className="h-24 w-24 shrink-0 object-contain drop-shadow-lg sm:h-32 sm:w-32 lg:h-36 lg:w-36"
+      />
+      <span className="flex flex-col items-end leading-none text-right">
         <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
         <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
           Montaser's Cool Edition
         </span>
-      </span>
-      <span className="flex w-full justify-center">
-        <img
-          src="/seen-jeem-logo-new.png"
-          alt="شعار الذئب الخاص بسين وجيم"
-          style={{ objectFit: "contain" }}
-          className="h-40 w-40 max-h-[40vw] max-w-[40vw] shrink-0 object-contain drop-shadow-lg sm:h-56 sm:w-56 lg:h-64 lg:w-64"
-        />
       </span>
     </div>
   );
