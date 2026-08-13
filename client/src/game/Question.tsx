@@ -9,6 +9,7 @@ import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
 const MAIN = 60;
+const FIVE_SECONDS = 5;
 const SECOND = 10;
 const CALL = 30;
 const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فقط
@@ -175,29 +176,38 @@ export default function QuestionView() {
     setTileHintsUsed(0);
     setSelectedTilePosition(null);
     setTileCompleted(false);
+    const isFiveSecondsRound = activeCell?.catKey === "fiveseconds";
+    setSeconds(isFiveSecondsRound ? FIVE_SECONDS : MAIN);
+    setStage("main");
+    setRunning(true);
+    setRevealed(false);
+    setCall(null);
   }, [active?.cellId, activeCell?.points]);
 
   // Restore timer from saved state on component mount
   useEffect(() => {
     if (!active?.cellId || !state.timerEndTimestamp) return;
-    
+
     const now = Date.now();
     const msRemaining = state.timerEndTimestamp - now;
-    
+
     // Only restore if timer hasn't completely expired
     if (msRemaining > 1000) {
       const secondsRemaining = Math.ceil(msRemaining / 1000);
       const catKey = activeCell?.catKey;
       const isSilentFilms = catKey === "silentfilms";
       const isDrawGuess = catKey === "drawguess";
-      
+      const isFiveSeconds = catKey === "fiveseconds";
+
       // For QR modes, timer ranges differ
-      const maxMain = isSilentFilms 
+      const maxMain = isFiveSeconds
+        ? FIVE_SECONDS
+        : isSilentFilms
         ? (activeCell?.points === 600 ? 60 : 90)
         : isDrawGuess
           ? 60
           : MAIN;
-      
+
       if (secondsRemaining <= maxMain) {
         setSeconds(secondsRemaining);
         setStage("main");
@@ -217,10 +227,10 @@ export default function QuestionView() {
   // Restore call timer from saved state
   useEffect(() => {
     if (!state.callEndTimestamp) return;
-    
+
     const now = Date.now();
     const msRemaining = state.callEndTimestamp - now;
-    
+
     if (msRemaining > 1000 && msRemaining <= CALL * 1000) {
       setCall(Math.ceil(msRemaining / 1000));
       setRunning(true);
@@ -230,11 +240,11 @@ export default function QuestionView() {
   // Save timer state whenever it changes
   useEffect(() => {
     if (!active || !running) return;
-    
+
     const now = Date.now();
     const timerEndMs = now + (seconds * 1000);
     const callEndMs = call !== null ? now + (call * 1000) : undefined;
-    
+
     dispatch({
       type: "SET_TIMER",
       timerEndTimestamp: timerEndMs,
@@ -265,6 +275,11 @@ export default function QuestionView() {
       }
       setSeconds((s) => {
         if (s > 1) return s - 1;
+        if (activeCell?.catKey === "fiveseconds") {
+          setStage("over");
+          setRunning(false);
+          return 0;
+        }
         if (stageRef.current === "main") {
           setStage("second");
           return SECOND;
@@ -275,7 +290,7 @@ export default function QuestionView() {
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [running, revealed, call]);
+  }, [running, revealed, call, activeCell?.catKey]);
 
   if (!active || !activeCell) return null;
 
@@ -301,6 +316,7 @@ export default function QuestionView() {
   const isAudienceChoice = catKey === "audiencechoice";
   const isSilentFilms = catKey === "silentfilms";
   const isDrawGuess = catKey === "drawguess";
+  const isFiveSeconds = catKey === "fiveseconds";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
   // whoami scoring: first clue free, then deductions
@@ -348,7 +364,7 @@ export default function QuestionView() {
   const movingLetters = isMoving
     ? movingWords.flatMap((w, wi) => w.split("").map((ch) => ({ ch, wi })))
     : [];
-  
+
   const reversedText = isReversed ? activeCell.question.a.split("").reverse().join("") : "";
 
   const playAudio = () => {
@@ -377,16 +393,18 @@ export default function QuestionView() {
     if (solved && !revealed) setRunning(false);
   }, [isTilePuzzle, tilePositions, revealed, setRunning]);
 
-  const total = call !== null 
-    ? CALL 
+  const total = call !== null
+    ? CALL
     : isSilentFilms
       ? (activeCell.points === 600 ? 60 : 90)
-      : isDrawGuess 
+      : isDrawGuess
         ? 60
         : stage === "main" ? MAIN : SECOND;
   const shown = call !== null ? call : seconds;
   const label =
-    call !== null
+    isFiveSeconds && call === null
+      ? (stage === "main" ? "خمس ثواني — كل الفرق تجيب!" : "انتهى الوقت!")
+      : call !== null
       ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
         ? `دقيقة كاملة لـ${answering.name}`
@@ -777,10 +795,10 @@ export default function QuestionView() {
 
                 {/* Current submitted order or shuffled if empty */}
                 {(() => {
-                  const currentOrder = submittedOrder.length > 0 
+                  const currentOrder = submittedOrder.length > 0
                     ? submittedOrder
                     : (activeCell.question.orderItems || []);
-                  
+
                   if (currentOrder.length === 0) {
                     return <div className="text-xs text-center text-muted-foreground">لا توجد عناصر للترتيب</div>;
                   }
@@ -1117,8 +1135,33 @@ export default function QuestionView() {
               </div>
             </div>
           )}
+          {isFiveSeconds && !revealed && (
+            <div className="mb-5 rounded-2xl border-2 border-primary-border bg-primary/10 p-4 text-center" data-testid="block-five-seconds">
+              <p className="text-lg font-black" style={{ color: QUESTION_TEXT_COLOR }}>
+                كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ٥ ثواني.
+              </p>
+              <p className="mt-1 text-sm font-bold text-muted-foreground">
+                يختار المضيف أول فريق أكمل الإجابات الصحيحة.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {state.teams.map((team, teamIdx) => (
+                  <Button
+                    key={teamIdx}
+                    data-testid={`button-five-seconds-team${teamIdx}-correct`}
+                    onClick={() => {
+                      setRunning(false);
+                      resolveCorrect(teamIdx);
+                    }}
+                    className="sj-press rounded-2xl border-2 border-emerald-600 bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                  >
+                    {team.name} أول إجابة صحيحة (+{activeCell.points})
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-6 flex flex-col items-center gap-4 sm:mt-8">
-            <CircleTimer seconds={shown} total={total} label={label} paused={!running || revealed} />
+            <CircleTimer seconds={shown} total={isFiveSeconds && call === null ? FIVE_SECONDS : total} label={label} paused={!running || revealed} />
             {!revealed ? (
               <Button
                 data-testid="button-reveal"
@@ -1172,6 +1215,7 @@ export default function QuestionView() {
         size="sm"
         variant="outline"
         disabled={
+          isFiveSeconds ||
           state.teams[active.askingTeam].used[l.key] ||
           active.lifelines[l.key] !== undefined ||
           (l.key === "phone" && call !== null) ||
