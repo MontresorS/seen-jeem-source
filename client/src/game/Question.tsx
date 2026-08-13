@@ -150,7 +150,7 @@ export default function QuestionView() {
   const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
-  const [tilePositions, setTilePositions] = useState<number[]>([...ALL_TILE_INDEXES]);
+  const [tilePositions, setTilePositions] = useState<number[]>([8, 7, 6, 5, 4, 3, 2, 1, 0]);
   const [tileLockedPositions, setTileLockedPositions] = useState<number[]>([]);
   const [tileHintAllowance, setTileHintAllowance] = useState(0);
   const [tileHintsUsed, setTileHintsUsed] = useState(0);
@@ -1126,7 +1126,6 @@ export default function QuestionView() {
                   setRevealed(true);
                   setRunning(false);
                 }}
-                disabled={isTilePuzzle && !tileCompleted}
                 className="sj-press h-14 w-full max-w-md rounded-2xl border-2 border-primary-border text-lg font-black sj-shadow 2xl:h-20 2xl:max-w-xl 2xl:text-3xl"
               >
                 <Eye className="ml-2 h-5 w-5 2xl:h-8 2xl:w-8" /> أظهر الإجابة

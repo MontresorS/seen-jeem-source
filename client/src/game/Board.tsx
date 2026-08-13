@@ -129,7 +129,7 @@ export default function Board() {
           ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6";
   return (
-    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 2xl:gap-3 2xl:px-6">
+    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 px-3 pb-8 pt-3 sm:px-4 2xl:gap-2 2xl:px-6">
       {/* top bar — always visible */}
       <header className="flex shrink-0 flex-col items-center gap-2">
         <Logo />
