@@ -15,7 +15,6 @@ export interface Question {
   audiencePercentages?: Record<string, number>;
   orderItems?: string[];
   correctOrder?: string[];
-  sourceQuestionId?: string;
 }
 export interface Category { key: string; name: string; emoji: string; hasImages?: boolean; questions: Question[] }
 

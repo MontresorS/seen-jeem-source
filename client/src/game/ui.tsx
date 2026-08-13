@@ -15,14 +15,8 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-3", className)}>
-      <img
-        src="/seen-jeem-logo.png"
-        alt="شعار سين وجيم — نسخة منتصر المحسنة"
-        style={{ objectFit: "contain" }}
-        className="h-32 w-32 shrink-0 object-contain drop-shadow-lg sm:h-48 sm:w-48 lg:h-56 lg:w-56"
-      />
-      <span className="flex flex-col leading-none">
+    <div className={cn("relative w-full min-h-[5.5rem] sm:min-h-[7rem] lg:min-h-[8rem]", className)}>
+      <span className="absolute right-0 top-0 flex flex-col leading-none text-right">
         <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
@@ -30,7 +24,34 @@ export function Logo({ className }: { className?: string }) {
           Montaser's Cool Edition
         </span>
       </span>
-    </span>
+      <span className="flex w-full justify-center">
+        <img
+          src="/seen-jeem-logo-new.png"
+          alt="شعار الذئب الخاص بسين وجيم"
+          style={{ objectFit: "contain" }}
+          className="h-20 w-20 shrink-0 object-contain drop-shadow-lg sm:h-28 sm:w-28 lg:h-32 lg:w-32"
+        />
+      </span>
+    </div>
+  );
+}
+
+export function CategoryVisual({
+  catKey,
+  emoji,
+  className,
+}: {
+  catKey: string;
+  emoji: string;
+  className?: string;
+}) {
+  if (catKey !== "tilepuzzle") return <span className={className}>{emoji}</span>;
+  return (
+    <img
+      src="/images/tilepuzzle/tilepuzzle-emblem.svg"
+      alt="شعار ركّبها صح"
+      className={cn("h-9 w-9 object-contain", className)}
+    />
   );
 }
 
@@ -193,7 +214,8 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
                 <b>🎈 حروف متحركة:</b> حروف الإجابة بتتحرك قدامكوم بعشوائية — ركّبوها واعرفوا الكلمة.
               </li>
               <li>
-                <b>🧩 ركّبها صح:</b> صورة مقسمة ٣×٣، تبدأ ببلاطة أو اثنتين فقط، وتقدر تكشف بلاطة إضافية كل مرة.
+                <b>🧩 ركّبها صح:</b> لغز صور ٣×٣ حقيقي، بدّلوا بين بلاطتين لإرجاع الصورة كاملة، ومع كل مستوى توجد
+                مساعدات تثبيت خاصة.
               </li>
               <li>
                 <b>🤥 مين الكدّاب:</b> ثلاث جمل (أ/ب/ج) وفيها جملة واحدة كاذبة فقط.

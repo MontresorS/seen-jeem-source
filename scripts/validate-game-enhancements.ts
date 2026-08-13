@@ -3,7 +3,13 @@ import path from "node:path";
 import { CATEGORIES } from "../client/src/data/questions";
 import { LIAR_QUESTIONS, TILE_PUZZLE_QUESTIONS } from "../client/src/data/newModes";
 import { LIFELINES, initialState, isValidSetup, nextTeamIndex, reducer } from "../client/src/game/state";
-import { buildTilePuzzleState, revealNextTile } from "../client/src/game/Question";
+import {
+  applyTilePuzzleFixHint,
+  buildTilePuzzleState,
+  canSwapTilePositions,
+  isTilePuzzleSolved,
+  swapTilePositions,
+} from "../client/src/game/Question";
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
@@ -74,25 +80,67 @@ function validateTilePuzzleRounds() {
   assert(dist[200] === 17 && dist[400] === 17 && dist[600] === 16, "tilepuzzle points distribution must be 17/17/16");
   const uniqueImages = new Set(TILE_PUZZLE_QUESTIONS.map((round) => round.image));
   assert(uniqueImages.size === TILE_PUZZLE_QUESTIONS.length, "tilepuzzle rounds must use unique local image mappings");
+  const uniqueAnswers = new Set(TILE_PUZZLE_QUESTIONS.map((round) => round.a));
+  assert(uniqueAnswers.size === TILE_PUZZLE_QUESTIONS.length, "tilepuzzle rounds must use unique answers");
+
+  const tilePuzzleAssetsDir = path.resolve(repoRoot, "client/public/images/tilepuzzle");
+  const dedicatedRoundAssets = fs
+    .readdirSync(tilePuzzleAssetsDir)
+    .filter((entry) => /^tilepuzzle-\d+\.svg$/u.test(entry));
+  assert(dedicatedRoundAssets.length === 50, "tilepuzzle assets directory must contain exactly 50 round SVGs");
 
   for (const round of TILE_PUZZLE_QUESTIONS) {
-    assert(round.image?.startsWith("./images/"), `tilepuzzle round ${round.id} must use local ./images asset`);
+    assert(round.image?.startsWith("./images/tilepuzzle/"), `tilepuzzle round ${round.id} must use dedicated tilepuzzle assets`);
+    assert(!round.image?.includes("/logos/"), `tilepuzzle round ${round.id} must not reuse logos assets`);
+    assert(!round.image?.includes("/zoom/"), `tilepuzzle round ${round.id} must not reuse zoom assets`);
+    assert(!round.image?.includes("/wadda7/"), `tilepuzzle round ${round.id} must not reuse wadda7 assets`);
+    assert(!("sourceQuestionId" in round), `tilepuzzle round ${round.id} must not reference sourceQuestionId`);
     const absolutePath = path.resolve(repoRoot, "client/public", round.image!.replace("./", ""));
     assert(fs.existsSync(absolutePath), `tilepuzzle round ${round.id} image file missing: ${round.image}`);
-    assert(Boolean(round.sourceQuestionId), `tilepuzzle round ${round.id} must keep sourceQuestionId`);
   }
 
-  const tileState = buildTilePuzzleState("tilepuzzle-01");
-  assert(tileState.order.length === 9, "tile puzzle must always generate 9 tiles");
-  assert(
-    tileState.initialRevealed.length >= 1 && tileState.initialRevealed.length <= 2,
-    "tile puzzle initial reveal must be 1 or 2",
-  );
-  const afterOneReveal = revealNextTile(tileState.order, tileState.initialRevealed);
-  assert(
-    afterOneReveal.length === tileState.initialRevealed.length + 1,
-    "tile puzzle reveal control must reveal exactly one tile per press",
-  );
+  const tierExpectations: Record<200 | 400 | 600, { locked: number; hints: number }> = {
+    200: { locked: 3, hints: 2 },
+    400: { locked: 1, hints: 1 },
+    600: { locked: 0, hints: 0 },
+  };
+
+  ([200, 400, 600] as const).forEach((points) => {
+    const tileState = buildTilePuzzleState(`tilepuzzle-state-${points}`, points);
+    assert(tileState.tiles.length === 9, "tile puzzle must always generate 9 tiles");
+    assert(tileState.lockedPositions.length === tierExpectations[points].locked, `tile puzzle ${points} must lock expected tiles`);
+    assert(tileState.hintAllowance === tierExpectations[points].hints, `tile puzzle ${points} must expose expected hints`);
+    assert(!isTilePuzzleSolved(tileState.tiles), `tile puzzle ${points} scramble must not start solved`);
+
+    const fixedCount = tileState.tiles.filter((tile, position) => tile === position).length;
+    assert(fixedCount === tierExpectations[points].locked, `tile puzzle ${points} must start with exact fixed-tile count`);
+
+    const firstUnlocked = [0, 1, 2, 3, 4, 5, 6, 7, 8].find((position) => !tileState.lockedPositions.includes(position));
+    const secondUnlocked = [0, 1, 2, 3, 4, 5, 6, 7, 8].find(
+      (position) => position !== firstUnlocked && !tileState.lockedPositions.includes(position),
+    );
+    assert(firstUnlocked !== undefined && secondUnlocked !== undefined, "tile puzzle must have swappable unlocked tiles");
+    assert(canSwapTilePositions(tileState.lockedPositions, firstUnlocked, secondUnlocked), "unlocked tiles must be swappable");
+    const swapped = swapTilePositions(tileState.tiles, firstUnlocked, secondUnlocked);
+    assert(
+      swapped[firstUnlocked] === tileState.tiles[secondUnlocked] && swapped[secondUnlocked] === tileState.tiles[firstUnlocked],
+      "two-tile swap must exchange positions",
+    );
+
+    if (tileState.lockedPositions.length > 0) {
+      const locked = tileState.lockedPositions[0];
+      assert(!canSwapTilePositions(tileState.lockedPositions, locked, firstUnlocked), "locked tile must be non-swappable");
+    }
+
+    if (tierExpectations[points].hints > 0) {
+      const hinted = applyTilePuzzleFixHint(tileState.tiles, tileState.lockedPositions);
+      assert(hinted !== null, `tile puzzle ${points} should allow fix hint`);
+      const newestLock = hinted.lockedPositions[hinted.lockedPositions.length - 1];
+      assert(hinted.tiles[newestLock] === newestLock, `tile puzzle ${points} fix hint must lock a correct tile`);
+    }
+  });
+
+  assert(isTilePuzzleSolved([0, 1, 2, 3, 4, 5, 6, 7, 8]), "tile puzzle completion detection must detect solved board");
 }
 
 function validateLiarRounds() {

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CATEGORIES } from "@/data/questions";
 import { THREE_TEAM_CATEGORY_COUNT, TWO_TEAM_CATEGORY_OPTIONS, useGame } from "./state";
-import { HelpDialog, Logo } from "./ui";
+import { CategoryVisual, HelpDialog, Logo } from "./ui";
 import { cn } from "@/lib/utils";
 
 export default function Setup() {
@@ -43,7 +43,7 @@ export default function Setup() {
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-6 sm:pt-8 2xl:max-w-[1700px] 2xl:px-10">
       <header className="mb-6 flex flex-col items-center gap-3">
-        <Logo className="justify-center" />
+        <Logo />
         <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
           <span
             data-testid="text-bank-total"
@@ -59,15 +59,44 @@ export default function Setup() {
       </header>
 
       <div className="sj-fade-up mb-7 rounded-3xl border-2 border-card-border bg-card p-5 sj-shadow sm:p-7">
-        <h1 className="mb-1 text-xl font-black text-secondary dark:text-foreground sm:text-2xl 2xl:text-4xl">
-          جهّزوا اللعبة 🎉
-        </h1>
+        <div className="mb-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <h1
+            className="col-start-3 text-right text-xl font-black sm:text-2xl 2xl:text-4xl"
+            style={{ color: "#3E2723" }}
+          >
+            جهّزوا اللعبة 🎉
+          </h1>
+          <div className="col-start-2 flex items-center gap-2">
+            <Button
+              type="button"
+              variant={teamCount === 2 ? "default" : "outline"}
+              className="rounded-xl border-2 px-4 font-black"
+              onClick={() => {
+                setTeamCount(2);
+                setPicked((prev) => prev.slice(0, twoTeamCategoryTarget));
+              }}
+            >
+              فريقان
+            </Button>
+            <Button
+              type="button"
+              variant={teamCount === 3 ? "default" : "outline"}
+              className="rounded-xl border-2 px-4 font-black"
+              onClick={() => {
+                setTeamCount(3);
+                setPicked((prev) => prev.slice(0, THREE_TEAM_CATEGORY_COUNT));
+              }}
+            >
+              ٣ فرق
+            </Button>
+          </div>
+        </div>
         <p className="mb-5 text-sm text-muted-foreground 2xl:text-xl">
           اكتبوا أسماء الفرق، واختاروا عدد الفئات المناسب (فريقان: ٦/٩/١٢ — ثلاثة فرق: ٩). الأسئلة ما تتكرر بين
           الألعاب في نفس الجلسة.
         </p>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="game-name" className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
               اسم اللعبة (اختياري)
@@ -80,35 +109,6 @@ export default function Setup() {
               placeholder="ليلة سين وجيم"
               className="rounded-xl border-2 text-right 2xl:h-14 2xl:text-xl"
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
-              عدد الفرق
-            </Label>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant={teamCount === 2 ? "default" : "outline"}
-                className="flex-1 rounded-xl border-2 font-black"
-                onClick={() => {
-                  setTeamCount(2);
-                  setPicked((prev) => prev.slice(0, twoTeamCategoryTarget));
-                }}
-              >
-                فريقان
-              </Button>
-              <Button
-                type="button"
-                variant={teamCount === 3 ? "default" : "outline"}
-                className="flex-1 rounded-xl border-2 font-black"
-                onClick={() => {
-                  setTeamCount(3);
-                  setPicked((prev) => prev.slice(0, THREE_TEAM_CATEGORY_COUNT));
-                }}
-              >
-                ٣ فرق
-              </Button>
-            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="team1" className="text-xs font-bold 2xl:text-base" style={{ color: "#3E2723" }}>
@@ -245,9 +245,11 @@ export default function Setup() {
                 full && "cursor-not-allowed opacity-45",
               )}
             >
-              <span aria-hidden className="text-3xl leading-none sm:text-4xl 2xl:text-6xl">
-                {c.emoji}
-              </span>
+              <CategoryVisual
+                catKey={c.key}
+                emoji={c.emoji}
+                className={c.key === "tilepuzzle" ? "h-10 w-10 sm:h-12 sm:w-12 2xl:h-16 2xl:w-16" : "text-3xl leading-none sm:text-4xl 2xl:text-6xl"}
+              />
               <span className="text-sm font-extrabold leading-snug text-secondary dark:text-foreground sm:text-base 2xl:text-2xl">
                 {c.name}
               </span>

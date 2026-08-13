@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="ركّبها صح">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#0F5E63"/>
+  <path d="M24 66a14 14 0 0 1 14-14h10v-8a10 10 0 1 1 20 0v8h12a14 14 0 0 1 14 14v28H24V66z" fill="#B67B2A"/>
+  <path d="M58 94V74a8 8 0 0 1 8-8h10v-10a10 10 0 1 1 20 0v38H58z" fill="#56B4A6"/>
+  <path d="M34 44a10 10 0 1 1 20 0v10H38a14 14 0 0 0-14 14V44h10z" fill="#C88E39"/>
+</svg>
