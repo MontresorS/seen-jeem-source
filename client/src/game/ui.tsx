@@ -15,31 +15,12 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2", className)} dir="ltr">
-      <div aria-hidden="true" />
+    <div className={cn("flex w-full justify-center", className)}>
       <img
         src="/seen-jeem-logo-new.png"
         alt="الشعار الرئيسي لسين وجيم"
         className="h-[13.5rem] w-[13.5rem] shrink-0 object-contain drop-shadow-lg sm:h-[18rem] sm:w-[18rem] lg:h-[20.25rem] lg:w-[20.25rem]"
       />
-      <span className="flex items-center gap-2 justify-self-end text-right" dir="ltr">
-        <span dir="rtl">
-          <span className="flex flex-col items-end leading-none">
-            <span className="text-lg font-extrabold tracking-tight sm:text-lg lg:text-2xl" style={{ color: "#3E2723" }}>
-              سين وجيم
-            </span>
-            <span className="mt-1 text-[9px] font-semibold text-muted-foreground sm:text-[11px] lg:text-xs">
-              Montaser's Cool Edition
-            </span>
-          </span>
-        </span>
-        <img
-          src="/seen-jeem-logo-new.png"
-          alt=""
-          aria-hidden="true"
-          className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10 lg:h-12 lg:w-12"
-        />
-      </span>
     </div>
   );
 }

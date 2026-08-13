@@ -131,8 +131,12 @@ export default function Board() {
   return (
     <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 px-3 pb-8 pt-3 sm:px-4 2xl:gap-2 2xl:px-6">
       {/* top bar — always visible */}
-      <header className="flex shrink-0 flex-col items-center gap-2">
-        <Logo />
+      <header className="flex shrink-0 items-start justify-end">
+        <img
+          src="/seen-jeem-logo-new.png"
+          alt="الشعار الرئيسي لسين وجيم"
+          className="h-10 w-10 object-contain sm:h-12 sm:w-12 2xl:h-16 2xl:w-16"
+        />
         {state.gameName && (
           <p
             className="text-center text-sm font-extrabold text-primary 2xl:text-2xl"
@@ -222,7 +226,7 @@ export default function Board() {
             <section
               key={key}
               data-testid={`column-category-${key}`}
-              className="flex flex-col rounded-2xl border-2 border-card-border bg-card sj-shadow"
+              className="flex flex-col rounded-2xl border-2 border-[#B45309] bg-card sj-shadow"
             >
               <div className="flex shrink-0 items-center gap-2 bg-secondary px-3 py-2 text-secondary-foreground 2xl:py-3">
                 <CategoryVisual
@@ -250,10 +254,10 @@ export default function Board() {
                       cell.used
                         ? "cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground/60"
                         : cell.points === 600
-                          ? "border-primary-border bg-primary text-primary-foreground"
+                          ? "border-[#B45309] bg-primary text-primary-foreground"
                           : cell.points === 400
-                            ? "border-amber-500/70 bg-accent text-accent-foreground"
-                            : "border-card-border bg-muted text-secondary dark:text-foreground",
+                            ? "border-[#B45309] bg-accent text-accent-foreground"
+                            : "border-[#B45309] bg-muted text-secondary dark:text-foreground",
                     )}
                   >
                     {cell.used ? "✓" : cell.points}
