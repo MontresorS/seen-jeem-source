@@ -15,20 +15,26 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("flex w-full items-center justify-between gap-3 sm:gap-4", className)}>
-      <img
-        src="/seen-jeem-logo-new.png"
-        alt="شعار الذئب الخاص بسين وجيم"
-        className="h-24 w-24 shrink-0 object-contain drop-shadow-lg sm:h-32 sm:w-32 lg:h-36 lg:w-36"
-      />
-      <span className="flex flex-col items-end leading-none text-right">
+    <div className={cn("grid w-full grid-cols-3 items-center", className)}>
+      {/* Left spacer — mirrors the wordmark column so the wolf is geometrically centred */}
+      <div aria-hidden="true" />
+      {/* Centre — wolf logo */}
+      <div className="flex justify-center">
+        <img
+          src="/seen-jeem-logo-new.png"
+          alt="شعار الذئب الخاص بسين وجيم"
+          className="h-36 w-36 shrink-0 object-contain drop-shadow-lg sm:h-48 sm:w-48 lg:h-[13.5rem] lg:w-[13.5rem]"
+        />
+      </div>
+      {/* Right — wordmark pinned to the right edge */}
+      <div className="flex flex-col items-end text-right leading-none">
         <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
         </span>
         <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
           Montaser's Cool Edition
         </span>
-      </span>
+      </div>
     </div>
   );
 }

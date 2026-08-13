@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
+import { type EscapeMapQuestion, type FiveSecondsQuestion, type NaqesQuestion, type MapNode } from "@/data/newModes";
 import { playSoundQuestion } from "@/sound-mode";
 import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY, nextTeamIndex } from "./state";
 import { CategoryVisual, CircleTimer, LifelineChip, LifelineIcon } from "./ui";
@@ -150,12 +151,20 @@ export default function QuestionView() {
   const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
-  const [tilePositions, setTilePositions] = useState<number[]>([...ALL_TILE_INDEXES]);
+  // Initialise to a reversed (unsolved) state so the solved-check effect does NOT
+  // fire with a false-positive on first render before the per-question reset runs.
+  const [tilePositions, setTilePositions] = useState<number[]>([8, 7, 6, 5, 4, 3, 2, 1, 0]);
   const [tileLockedPositions, setTileLockedPositions] = useState<number[]>([]);
   const [tileHintAllowance, setTileHintAllowance] = useState(0);
   const [tileHintsUsed, setTileHintsUsed] = useState(0);
   const [selectedTilePosition, setSelectedTilePosition] = useState<number | null>(null);
   const [tileCompleted, setTileCompleted] = useState(false);
+  const [escapePath, setEscapePath] = useState<string[]>([]);
+  const [escapePhase, setEscapePhase] = useState<"playing" | "escaped" | "dead">("playing");
+  const [fiveSecActive, setFiveSecActive] = useState(false);
+  const [fiveSecRemaining, setFiveSecRemaining] = useState(5);
+  const [naqesLayer, setNaqesLayer] = useState(0);
+  const [naqesAutoReveal, setNaqesAutoReveal] = useState(false);
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
@@ -175,6 +184,12 @@ export default function QuestionView() {
     setTileHintsUsed(0);
     setSelectedTilePosition(null);
     setTileCompleted(false);
+    setEscapePath([]);
+    setEscapePhase("playing");
+    setFiveSecActive(false);
+    setFiveSecRemaining(5);
+    setNaqesLayer(0);
+    setNaqesAutoReveal(false);
   }, [active?.cellId, activeCell?.points]);
 
   // Restore timer from saved state on component mount
@@ -297,6 +312,9 @@ export default function QuestionView() {
   const isBeforeAfter = catKey === "beforeafter";
   const isLiar = catKey === "liar";
   const isTilePuzzle = catKey === "tilepuzzle";
+  const isEscapeMap = catKey === "escapemap";
+  const isFiveSeconds = catKey === "fiveseconds";
+  const isNaqes = catKey === "naqes";
   const isClosestNumber = catKey === "closestnumber";
   const isAudienceChoice = catKey === "audiencechoice";
   const isSilentFilms = catKey === "silentfilms";
@@ -376,6 +394,29 @@ export default function QuestionView() {
     setTileCompleted(solved);
     if (solved && !revealed) setRunning(false);
   }, [isTilePuzzle, tilePositions, revealed, setRunning]);
+
+  useEffect(() => {
+    if (!isNaqes || !naqesAutoReveal || revealed) return;
+    const q = activeCell?.question as unknown as NaqesQuestion | undefined;
+    if (!q?.layers) return;
+    if (naqesLayer >= q.layers.length) {
+      setNaqesAutoReveal(false);
+      return;
+    }
+    const id = window.setTimeout(() => setNaqesLayer((prev) => prev + 1), 3000);
+    return () => window.clearTimeout(id);
+  }, [isNaqes, naqesAutoReveal, naqesLayer, revealed, activeCell?.question]);
+
+  useEffect(() => {
+    if (!isFiveSeconds || !fiveSecActive || revealed) return;
+    if (fiveSecRemaining <= 0) {
+      setFiveSecActive(false);
+      setRunning(false);
+      return;
+    }
+    const id = window.setTimeout(() => setFiveSecRemaining((prev) => Math.max(prev - 1, 0)), 1000);
+    return () => window.clearTimeout(id);
+  }, [isFiveSeconds, fiveSecActive, fiveSecRemaining, revealed]);
 
   const total = call !== null 
     ? CALL 
@@ -527,7 +568,7 @@ export default function QuestionView() {
                 </p>
               )}
             </div>
-          ) : (
+          ) : isFiveSeconds ? null : (
             <p
               data-testid="text-question"
               dir="rtl"
@@ -1062,6 +1103,127 @@ export default function QuestionView() {
               )}
             </div>
           )}
+          {isEscapeMap && (() => {
+            const q = activeCell.question as unknown as EscapeMapQuestion;
+            const currentNode = q.nodes.find((n: MapNode) =>
+              escapePath.length === 0 ? n.id === q.nodes[0].id : n.id === escapePath[escapePath.length - 1]
+            ) ?? q.nodes[0];
+            const isFinished = escapePhase !== "playing";
+            return (
+              <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-escape-map">
+                <div className="flex flex-wrap justify-center gap-2 text-sm font-bold">
+                  {(escapePath.length === 0 ? [q.nodes[0].id] : escapePath).map((nid, i) => {
+                    const node = q.nodes.find((n: MapNode) => n.id === nid);
+                    return <span key={i} className="rounded-full bg-primary/15 px-3 py-1">{node?.label ?? nid}</span>;
+                  })}
+                  {escapePhase === "escaped" && <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-emerald-800">🏁 {q.a}</span>}
+                  {escapePhase === "dead" && <span className="rounded-full bg-red-500/20 px-3 py-1 text-red-800">💀 طريق مسدود!</span>}
+                </div>
+                {!isFinished && (
+                  <div className="w-full max-w-lg rounded-2xl border-2 border-card-border bg-secondary p-4">
+                    <p className="text-center text-base font-extrabold" style={{ color: "#3E2723" }}>{currentNode.clue}</p>
+                  </div>
+                )}
+                {!isFinished && (
+                  <div className="flex flex-wrap justify-center gap-3">
+                    {currentNode.options.map((opt, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        className="rounded-full border-2 font-bold"
+                        onClick={() => {
+                          if (opt.isSafe) {
+                            const newPath = [...(escapePath.length === 0 ? [q.nodes[0].id] : escapePath), opt.nextNode];
+                            setEscapePath(newPath);
+                            const nextNode = q.nodes.find((n: MapNode) => n.id === opt.nextNode);
+                            if (!nextNode || nextNode.options.length === 0) {
+                              setEscapePhase("escaped");
+                              setRunning(false);
+                            }
+                          } else {
+                            setEscapePhase("dead");
+                            setRunning(false);
+                          }
+                        }}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {isFiveSeconds && (() => {
+            const q = activeCell.question as unknown as FiveSecondsQuestion;
+            return (
+              <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-five-seconds">
+                <p dir="rtl" className="text-center text-xl font-extrabold sm:text-2xl" style={{ color: "#3E2723" }}>
+                  {q.q}
+                </p>
+                <div className="text-center">
+                  <span className={`text-6xl font-black ${fiveSecRemaining <= 2 ? "text-red-600" : "text-primary"}`}>
+                    {fiveSecActive ? fiveSecRemaining : "5"}
+                  </span>
+                  <p className="text-sm font-bold text-muted-foreground">ثواني</p>
+                </div>
+                <Button
+                  disabled={fiveSecActive && fiveSecRemaining <= 0}
+                  className="sj-press h-14 w-full max-w-xs rounded-2xl border-2 border-primary-border font-black"
+                  onClick={() => {
+                    if (!fiveSecActive) {
+                      setFiveSecActive(true);
+                      setFiveSecRemaining(5);
+                    }
+                  }}
+                >
+                  {fiveSecActive ? (fiveSecRemaining > 0 ? "العداد شغّال!" : "انتهى الوقت!") : "ابدأ العداد ⏱️"}
+                </Button>
+                {revealed && q.exampleAnswers && (
+                  <div className="rounded-xl border border-card-border bg-secondary p-3 text-sm font-bold">
+                    <span className="text-muted-foreground">أمثلة: </span>{q.exampleAnswers.join(" — ")}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {isNaqes && (() => {
+            const q = activeCell.question as unknown as NaqesQuestion;
+            const totalLayers = q.layers.length;
+            const visibleLayers = Math.min(naqesLayer, totalLayers);
+            return (
+              <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-naqes">
+                <div className="rounded-2xl border-4 border-card-border bg-white p-2 shadow-inner">
+                  <svg viewBox={q.viewBox} className="h-64 w-64 sm:h-80 sm:w-80" style={{ display: "block" }}>
+                    {visibleLayers > 0 && (
+                      <g dangerouslySetInnerHTML={{ __html: q.layers[visibleLayers - 1] }} />
+                    )}
+                  </svg>
+                </div>
+                <p className="text-sm font-bold text-muted-foreground">
+                  الخطوة {visibleLayers} من {totalLayers}
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-2 font-bold"
+                    disabled={visibleLayers >= totalLayers || revealed}
+                    onClick={() => setNaqesLayer((prev) => Math.min(prev + 1, totalLayers))}
+                  >
+                    أظهر خطوة 🖊️
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-2 font-bold"
+                    onClick={() => setNaqesAutoReveal((v) => !v)}
+                    disabled={revealed}
+                  >
+                    {naqesAutoReveal ? "⏸ إيقاف التلقائي" : "▶ كشف تلقائي (3ث)"}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
           {hasImage && (isWadda7 || isZoom) && (
             <div className="mt-4 flex flex-col items-center gap-3">
               <div className="overflow-hidden rounded-2xl border-4 border-card-border bg-muted sj-shadow">
@@ -1126,7 +1288,7 @@ export default function QuestionView() {
                   setRevealed(true);
                   setRunning(false);
                 }}
-                disabled={isTilePuzzle && !tileCompleted}
+                disabled={isTilePuzzle && !tileCompleted && stage !== "over"}
                 className="sj-press h-14 w-full max-w-md rounded-2xl border-2 border-primary-border text-lg font-black sj-shadow 2xl:h-20 2xl:max-w-xl 2xl:text-3xl"
               >
                 <Eye className="ml-2 h-5 w-5 2xl:h-8 2xl:w-8" /> أظهر الإجابة

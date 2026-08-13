@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CATEGORIES } from "../client/src/data/questions";
-import { LIAR_QUESTIONS, TILE_PUZZLE_QUESTIONS } from "../client/src/data/newModes";
+import { LIAR_QUESTIONS, TILE_PUZZLE_QUESTIONS, ESCAPE_MAP_QUESTIONS, FIVE_SECONDS_QUESTIONS, NAQES_QUESTIONS } from "../client/src/data/newModes";
 import { LIFELINES, initialState, isValidSetup, nextTeamIndex, reducer } from "../client/src/game/state";
 import {
   applyTilePuzzleFixHint,
@@ -164,6 +164,51 @@ function validateLiarRounds() {
   }
 }
 
+
+function validateEscapeMapRounds() {
+  assert(ESCAPE_MAP_QUESTIONS.length === 50, "escapemap must contain exactly 50 rounds");
+  const dist = countByPoints(ESCAPE_MAP_QUESTIONS);
+  assert(dist[200] === 17 && dist[400] === 17 && dist[600] === 16, "escapemap points distribution must be 17/17/16");
+  const uniqueIds = new Set(ESCAPE_MAP_QUESTIONS.map((r) => r.id));
+  assert(uniqueIds.size === 50, "escapemap rounds must have unique IDs");
+  const uniqueAnswers = new Set(ESCAPE_MAP_QUESTIONS.map((r) => r.a));
+  assert(uniqueAnswers.size === 50, "escapemap rounds must have unique answers");
+  for (const r of ESCAPE_MAP_QUESTIONS) {
+    assert(r.nodes && r.nodes.length >= 3, `escapemap round ${r.id} must have at least 3 nodes (start, intermediate, end)`);
+    const hasEnd = r.nodes.some((n) => n.options.length === 0);
+    assert(hasEnd, `escapemap round ${r.id} must have an end node with no options`);
+  }
+}
+
+function validateFiveSecondsRounds() {
+  assert(FIVE_SECONDS_QUESTIONS.length === 50, "fiveseconds must contain exactly 50 rounds");
+  const dist = countByPoints(FIVE_SECONDS_QUESTIONS);
+  assert(dist[200] === 17 && dist[400] === 17 && dist[600] === 16, "fiveseconds points distribution must be 17/17/16");
+  const uniqueIds = new Set(FIVE_SECONDS_QUESTIONS.map((r) => r.id));
+  assert(uniqueIds.size === 50, "fiveseconds rounds must have unique IDs");
+  const uniqueQ = new Set(FIVE_SECONDS_QUESTIONS.map((r) => r.q));
+  assert(uniqueQ.size === 50, "fiveseconds prompts must be unique");
+  for (const r of FIVE_SECONDS_QUESTIONS) {
+    assert(r.exampleAnswers && r.exampleAnswers.length >= 3, `fiveseconds round ${r.id} must have at least 3 example answers`);
+  }
+}
+
+function validateNaqesRounds() {
+  assert(NAQES_QUESTIONS.length === 50, "naqes must contain exactly 50 rounds");
+  const dist = countByPoints(NAQES_QUESTIONS);
+  assert(dist[200] === 17 && dist[400] === 17 && dist[600] === 16, "naqes points distribution must be 17/17/16");
+  const uniqueIds = new Set(NAQES_QUESTIONS.map((r) => r.id));
+  assert(uniqueIds.size === 50, "naqes rounds must have unique IDs");
+  const uniqueAnswers = new Set(NAQES_QUESTIONS.map((r) => r.a));
+  assert(uniqueAnswers.size === 50, "naqes rounds must have unique answers");
+  for (const r of NAQES_QUESTIONS) {
+    assert(r.layers && r.layers.length >= 5 && r.layers.length <= 7, `naqes round ${r.id} must have 5–7 layers`);
+    for (const layer of r.layers) {
+      assert(!/<text/i.test(layer), `naqes round ${r.id} must not contain <text> in SVG layers`);
+    }
+  }
+}
+
 function validateLifelineInventory() {
   assert(LIFELINES.some((lifeline) => lifeline.key === "choices2"), "choices2 lifeline must exist");
 }
@@ -173,6 +218,9 @@ function main() {
   validateThreeTeamRotationAndScoring();
   validateTilePuzzleRounds();
   validateLiarRounds();
+  validateEscapeMapRounds();
+  validateFiveSecondsRounds();
+  validateNaqesRounds();
   validateLifelineInventory();
   console.log("validate-game-enhancements: OK");
 }
