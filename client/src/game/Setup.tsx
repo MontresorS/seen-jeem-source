@@ -59,14 +59,14 @@ export default function Setup() {
       </header>
 
       <div className="sj-fade-up mb-7 rounded-3xl border-2 border-card-border bg-card p-5 sj-shadow sm:p-7">
-        <div className="mb-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="mb-1 flex flex-col items-center gap-2">
           <h1
-            className="col-start-3 text-right text-xl font-black sm:text-2xl 2xl:text-4xl"
+            className="text-center text-xl font-black sm:text-2xl 2xl:text-4xl"
             style={{ color: "#3E2723" }}
           >
             جهّزوا اللعبة 🎉
           </h1>
-          <div className="col-start-2 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant={teamCount === 2 ? "default" : "outline"}

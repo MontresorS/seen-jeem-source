@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("relative w-full min-h-[5.5rem] sm:min-h-[7rem] lg:min-h-[8rem]", className)}>
+    <div className={cn("relative w-full min-h-[11rem] sm:min-h-[14rem] lg:min-h-[16rem]", className)}>
       <span className="absolute right-0 top-0 flex flex-col leading-none text-right">
         <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
           سين وجيم
@@ -29,7 +29,7 @@ export function Logo({ className }: { className?: string }) {
           src="/seen-jeem-logo-new.png"
           alt="شعار الذئب الخاص بسين وجيم"
           style={{ objectFit: "contain" }}
-          className="h-20 w-20 shrink-0 object-contain drop-shadow-lg sm:h-28 sm:w-28 lg:h-32 lg:w-32"
+          className="h-40 w-40 max-h-[40vw] max-w-[40vw] shrink-0 object-contain drop-shadow-lg sm:h-56 sm:w-56 lg:h-64 lg:w-64"
         />
       </span>
     </div>

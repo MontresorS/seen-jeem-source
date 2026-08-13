@@ -84,13 +84,19 @@ function validateTilePuzzleRounds() {
   assert(uniqueAnswers.size === TILE_PUZZLE_QUESTIONS.length, "tilepuzzle rounds must use unique answers");
 
   const tilePuzzleAssetsDir = path.resolve(repoRoot, "client/public/images/tilepuzzle");
-  const dedicatedRoundAssets = fs
+  const svgRoundAssets = fs
     .readdirSync(tilePuzzleAssetsDir)
     .filter((entry) => /^tilepuzzle-\d+\.svg$/u.test(entry));
-  assert(dedicatedRoundAssets.length === 50, "tilepuzzle assets directory must contain exactly 50 round SVGs");
+  assert(svgRoundAssets.length === 0, `tilepuzzle assets directory must NOT contain SVG placeholder round files; found: ${svgRoundAssets.join(", ")}`);
+
+  const rasterRoundAssets = fs
+    .readdirSync(tilePuzzleAssetsDir)
+    .filter((entry) => /^tilepuzzle-\d+\.(png|webp)$/iu.test(entry));
+  assert(rasterRoundAssets.length === 50, `tilepuzzle assets directory must contain exactly 50 raster .png/.webp round files; found ${rasterRoundAssets.length}`);
 
   for (const round of TILE_PUZZLE_QUESTIONS) {
     assert(round.image?.startsWith("./images/tilepuzzle/"), `tilepuzzle round ${round.id} must use dedicated tilepuzzle assets`);
+    assert(/\.(png|webp)$/i.test(round.image ?? ""), `tilepuzzle round ${round.id} image must be .png or .webp, not SVG`);
     assert(!round.image?.includes("/logos/"), `tilepuzzle round ${round.id} must not reuse logos assets`);
     assert(!round.image?.includes("/zoom/"), `tilepuzzle round ${round.id} must not reuse zoom assets`);
     assert(!round.image?.includes("/wadda7/"), `tilepuzzle round ${round.id} must not reuse wadda7 assets`);
