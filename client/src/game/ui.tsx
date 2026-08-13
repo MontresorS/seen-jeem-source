@@ -15,18 +15,21 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("flex w-full items-center justify-between gap-3 sm:gap-4", className)}>
+    <div className={cn("grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2", className)} dir="ltr">
+      <div aria-hidden="true" />
       <img
         src="/seen-jeem-logo-new.png"
         alt="شعار الذئب الخاص بسين وجيم"
-        className="h-24 w-24 shrink-0 object-contain drop-shadow-lg sm:h-32 sm:w-32 lg:h-36 lg:w-36"
+        className="h-36 w-36 shrink-0 object-contain drop-shadow-lg sm:h-48 sm:w-48 lg:h-[13.5rem] lg:w-[13.5rem]"
       />
-      <span className="flex flex-col items-end leading-none text-right">
-        <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
-          سين وجيم
-        </span>
-        <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
-          Montaser's Cool Edition
+      <span className="justify-self-end text-right" dir="rtl">
+        <span className="flex flex-col items-end leading-none">
+          <span className="text-lg font-extrabold tracking-tight sm:text-lg lg:text-2xl" style={{ color: "#3E2723" }}>
+            سين وجيم
+          </span>
+          <span className="mt-1 text-[9px] font-semibold text-muted-foreground sm:text-[11px] lg:text-xs">
+            Montaser's Cool Edition
+          </span>
         </span>
       </span>
     </div>
