@@ -42,19 +42,27 @@ export default function Setup() {
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-3 sm:pt-4 2xl:max-w-[1700px] 2xl:px-10">
-      <header className="mb-3 flex flex-col gap-2">
-        <Logo />
-        <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <span
-            data-testid="text-bank-total"
-            className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-lg"
+      <header className="mb-3">
+        <div className="relative">
+          <Logo className="-mt-10 -mb-12 sm:-mt-14 sm:-mb-16 lg:-mt-18 lg:-mb-20" />
+
+          <div
+            dir="rtl"
+            className="absolute left-0 top-[58%] z-10 flex -translate-y-1/2 flex-col items-start gap-1"
           >
-            بنك الأسئلة: {totalQuestions} سؤال في {CATEGORIES.length} فئات
-          </span>
-          <span className="rounded-full border-2 border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary 2xl:text-lg">
-            {usedTotal > 0 && `استُخدم: ${usedTotal} | `}متبقي: {totalRemaining}
-          </span>
-          <HelpDialog />
+            <div className="flex items-center gap-2">
+              <span
+                data-testid="text-bank-total"
+                className="rounded-full border-2 border-card-border bg-card px-3 py-1 text-xs font-bold text-muted-foreground 2xl:text-lg"
+              >
+                بنك الأسئلة: {totalQuestions} سؤال في {CATEGORIES.length} فئات
+              </span>
+              <span className="rounded-full border-2 border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary 2xl:text-lg">
+                {usedTotal > 0 && `استُخدم: ${usedTotal} | `}متبقي: {totalRemaining}
+              </span>
+              <HelpDialog />
+            </div>
+          </div>
         </div>
       </header>
 
@@ -156,7 +164,7 @@ export default function Setup() {
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-extrabold text-secondary dark:text-foreground 2xl:text-3xl">
-          <Users className="h-5 w-5 text-primary 2xl:h-8 2xl:w-8" /> اختاروا {requiredCategories} فئات من {CATEGORIES.length}
+          <Users className="h-5 w-5 2xl:h-8 2xl:w-8" style={{ color: "#3E2723" }} /> <span style={{ color: "#3E2723" }}>اختاروا {requiredCategories} فئات من {CATEGORIES.length}</span>
         </h2>
         <div className="flex flex-wrap items-center gap-2">
           {teamCount === 2 && (

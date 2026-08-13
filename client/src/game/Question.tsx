@@ -502,7 +502,7 @@ export default function QuestionView() {
                 <Volume2 className="ml-2 h-7 w-7" /> اضغط للاستماع للصوت 🔊
               </Button>
             </div>
-          ) : isCities ? (
+          ) : false ? (
             <div className="flex flex-col items-center gap-3" data-testid="block-cities">
               <div className="flex items-center gap-2 text-primary">
                 <MapPin className="h-6 w-6 sm:h-8 sm:w-8" />
