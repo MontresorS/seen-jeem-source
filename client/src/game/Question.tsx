@@ -157,6 +157,8 @@ export default function QuestionView() {
   const [tileHintsUsed, setTileHintsUsed] = useState(0);
   const [selectedTilePosition, setSelectedTilePosition] = useState<number | null>(null);
   const [tileCompleted, setTileCompleted] = useState(false);
+  const [routeProgress, setRouteProgress] = useState<string[]>([]);
+  const [routeFailed, setRouteFailed] = useState(false);
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
@@ -176,6 +178,8 @@ export default function QuestionView() {
     setTileHintsUsed(0);
     setSelectedTilePosition(null);
     setTileCompleted(false);
+    setRouteProgress([]);
+    setRouteFailed(false);
     const isFiveSecondsRound = activeCell?.catKey === "fiveseconds";
     setSeconds(isFiveSecondsRound ? FIVE_SECONDS : MAIN);
     setStage("main");
@@ -198,6 +202,7 @@ export default function QuestionView() {
       const isSilentFilms = catKey === "silentfilms";
       const isDrawGuess = catKey === "drawguess";
       const isFiveSeconds = catKey === "fiveseconds";
+  const isEscapeMap = catKey === "escapemap";
 
       // For QR modes, timer ranges differ
       const maxMain = isFiveSeconds
@@ -317,6 +322,7 @@ export default function QuestionView() {
   const isSilentFilms = catKey === "silentfilms";
   const isDrawGuess = catKey === "drawguess";
   const isFiveSeconds = catKey === "fiveseconds";
+  const isEscapeMap = catKey === "escapemap";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
   // whoami scoring: first clue free, then deductions
@@ -559,6 +565,83 @@ export default function QuestionView() {
             </p>
           )}
 
+          {isEscapeMap && (
+            <div className="mt-5 flex flex-col items-center gap-4" data-testid="block-escape-map">
+              <div className="w-full max-w-2xl rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="text-base font-black" style={{ color: QUESTION_TEXT_COLOR }}>
+                  اختاروا الطريق الصحيح خطوة بخطوة.
+                </p>
+                <p className="mt-1 text-sm font-bold text-muted-foreground">
+                  أي اختيار خاطئ يؤدي إلى طريق مسدود وينهي المحاولة.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {routeProgress.map((place, index) => (
+                    <span key={`${place}-${index}`} className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-black text-white">
+                      ✓ {place}
+                    </span>
+                  ))}
+                  {routeProgress.length < (activeCell.question.routeSteps?.length ?? 0) && !routeFailed && (
+                    <span className="rounded-full bg-muted px-3 py-1 text-sm font-black">
+                      الخطوة {routeProgress.length + 1}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {routeFailed ? (
+                <div className="w-full max-w-xl rounded-2xl border-2 border-destructive/50 bg-destructive/10 p-4 text-center">
+                  <p className="text-lg font-black text-destructive">🚫 طريق مسدود! لا نقاط لهذه الجولة.</p>
+                  <Button
+                    className="mt-3 rounded-xl"
+                    variant="outline"
+                    onClick={() => resolveNone()}
+                  >
+                    العودة للوحة
+                  </Button>
+                </div>
+              ) : routeProgress.length === (activeCell.question.routeSteps?.length ?? 0) ? (
+                <div className="w-full max-w-xl rounded-2xl border-2 border-emerald-600/50 bg-emerald-500/10 p-4 text-center">
+                  <p className="text-lg font-black text-emerald-800 dark:text-emerald-100">
+                    🎉 وصلتم للوجهة! اختاروا الفريق الفائز.
+                  </p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {state.teams.map((team, teamIdx) => (
+                      <Button
+                        key={teamIdx}
+                        className="rounded-xl border-2 border-emerald-600 bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                        onClick={() => resolveCorrect(teamIdx)}
+                      >
+                        {team.name} (+{activeCell.points})
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+                  {(activeCell.question.choices ?? []).map((place) => (
+                    <Button
+                      key={place}
+                      variant="outline"
+                      className="min-h-14 rounded-2xl border-2 text-base font-black"
+                      disabled={routeProgress.includes(place)}
+                      onClick={() => {
+                        const expected = activeCell.question.routeSteps?.[routeProgress.length];
+                        if (place === expected) {
+                          setRouteProgress((progress) => [...progress, place]);
+                        } else {
+                          setRouteFailed(true);
+                          setRunning(false);
+                        }
+                      }}
+                    >
+                      {place}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* MCQ choices rendering */}
           {catKey === 'truefalse' ? (
             <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-truefalse">
@@ -583,7 +666,7 @@ export default function QuestionView() {
               </div>
               <div className="mt-2 text-sm text-muted-foreground">التحديد يعرض فقط؛ اختر النتيجة النهائية بعد كشف الإجابة.</div>
             </div>
-          ) : Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
+          ) : !isEscapeMap && Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-choices">
               {isLiar && (
                 <p className="text-center text-sm font-extrabold text-primary sm:text-base">
