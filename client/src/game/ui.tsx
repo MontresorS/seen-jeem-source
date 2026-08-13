@@ -15,11 +15,11 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("flex w-full justify-end", className)} dir="ltr">
+    <div className={cn("flex w-full justify-center", className)}>
       <img
         src="/seen-jeem-logo-new.png"
         alt="الشعار الرئيسي لسين وجيم"
-        className="h-[13.5rem] w-[13.5rem] shrink-0 object-contain drop-shadow-lg -mr-6 sm:-mr-10 lg:-mr-14 sm:h-[18rem] sm:w-[18rem] lg:h-[20.25rem] lg:w-[20.25rem]"
+        className="h-[13.5rem] w-[13.5rem] shrink-0 object-contain drop-shadow-lg sm:h-[18rem] sm:w-[18rem] lg:h-[20.25rem] lg:w-[20.25rem]"
       />
     </div>
   );
