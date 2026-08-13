@@ -14,7 +14,8 @@
     "generate:image-questions": "node scripts/generate-image-questions.mjs",
     "review:image-questions": "python3 -m http.server 4174 --directory artifacts/image-review",
     "update:image-mapping": "node scripts/update-image-question-mapping.mjs",
-    "validate:image-questions": "node scripts/validate-image-question-mappings.mjs"
+    "validate:image-questions": "node scripts/validate-image-question-mappings.mjs",
+    "validate:game-enhancements": "tsx scripts/validate-game-enhancements.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

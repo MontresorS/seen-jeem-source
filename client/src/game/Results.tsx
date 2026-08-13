@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 
 export default function Results() {
   const { state, dispatch, totalRemaining, totalQuestions } = useGame();
-  const [a, b] = state.teams;
-  const tie = a.score === b.score;
-  const winner = tie ? null : a.score > b.score ? a : b;
+  const sortedTeams = [...state.teams].sort((a, b) => b.score - a.score);
+  const topScore = sortedTeams[0]?.score ?? 0;
+  const winners = state.teams.filter((team) => team.score === topScore);
+  const tie = winners.length !== 1;
+  const winner = tie ? null : winners[0];
   const answered = state.history.filter((h) => h.winner !== null).length;
 
   useEffect(() => {

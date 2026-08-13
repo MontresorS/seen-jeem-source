@@ -17,19 +17,33 @@ import { HelpDialog, LifelineChip, Logo } from "./ui";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_TEXT_COLOR = "#3E2723"; // dark brown
+const TEAM_THEMES = [
+  {
+    active: "border-primary bg-primary/12",
+    dot: "bg-primary",
+  },
+  {
+    active: "border-emerald-600 bg-emerald-100/80 dark:bg-emerald-900/30",
+    dot: "bg-emerald-600",
+  },
+  {
+    active: "border-violet-600 bg-violet-100/80 dark:bg-violet-900/30",
+    dot: "bg-violet-600",
+  },
+] as const;
 
 function TeamPanel({ index }: { index: TeamIndex }) {
   const { state, dispatch } = useGame();
   const team = state.teams[index];
+  if (!team) return null;
   const isTurn = state.turn === index;
+  const theme = TEAM_THEMES[index % TEAM_THEMES.length];
   return (
     <div
       data-testid={`panel-team-${index + 1}`}
       className={cn(
         "flex-1 rounded-2xl border-2 px-3 py-2 transition-colors 2xl:px-5 2xl:py-3",
-        isTurn
-          ? "border-primary bg-primary/12 sj-shadow"
-          : "border-card-border bg-card opacity-90",
+        isTurn ? `${theme.active} sj-shadow` : "border-card-border bg-card opacity-90",
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -44,7 +58,12 @@ function TeamPanel({ index }: { index: TeamIndex }) {
             {team.name}
           </p>
           <p className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground 2xl:text-lg">
-            {isTurn && <span className="text-primary">الدور عليه الآن •</span>}
+            {isTurn && (
+              <span className="inline-flex items-center gap-1 text-foreground">
+                <span className={cn("h-2 w-2 rounded-full", theme.dot)} />
+                الدور عليه الآن
+              </span>
+            )}
           </p>
         </button>
         <div className="flex shrink-0 items-center gap-1 2xl:gap-2">
@@ -101,11 +120,19 @@ export default function Board() {
   const { state, dispatch, remaining } = useGame();
   const holeArmedBy = state.pendingHole;
   const turnTeam = state.teams[state.turn];
+  const categoryGridClass =
+    state.teams.length === 3
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      : state.catKeys.length >= 12
+        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+        : state.catKeys.length === 9
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6";
   return (
     <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 lg:h-[100dvh] lg:overflow-hidden lg:pb-3 2xl:gap-3 2xl:px-6">
       {/* top bar — always visible */}
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <Logo />
+      <header className="flex shrink-0 flex-col items-center gap-2">
+        <Logo className="justify-center" />
         {state.gameName && (
           <p
             className="text-center text-sm font-extrabold text-primary 2xl:text-2xl"
@@ -114,7 +141,7 @@ export default function Board() {
             {state.gameName}
           </p>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           {state.recycledOnBoard && (
             <span
               data-testid="text-recycled-note"
@@ -161,29 +188,33 @@ export default function Board() {
         </div>
       </header>
       {/* scores + turn banner + بدون كلام */}
-      <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-stretch">
-        <TeamPanel index={0} />
-        <div className="flex flex-col gap-2 lg:w-[22%] lg:shrink-0">
-          <div
-            className={cn(
-              "flex flex-1 items-center justify-center rounded-2xl border-2 px-3 py-2 text-center text-sm font-extrabold 2xl:text-2xl",
-              holeArmedBy !== null
-                ? "border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
-                : "border-secondary/15 bg-secondary text-secondary-foreground",
-            )}
-            data-testid="text-turn-banner"
-          >
-            {holeArmedBy !== null ? (
-              <>🕳️ الحفرة مفعّلة لـ{state.teams[holeArmedBy].name} — افتحوا السؤال!</>
-            ) : (
-              <>الدور على: {turnTeam.name}</>
-            )}
-          </div>
+      <div className="flex shrink-0 flex-col gap-2">
+        <div
+          className={cn(
+            "flex items-center justify-center rounded-2xl border-2 px-3 py-2 text-center text-sm font-extrabold 2xl:text-2xl",
+            holeArmedBy !== null
+              ? "border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+              : "border-secondary/15 bg-secondary text-secondary-foreground",
+          )}
+          data-testid="text-turn-banner"
+        >
+          {holeArmedBy !== null ? (
+            <>🕳️ الحفرة مفعّلة لـ{state.teams[holeArmedBy].name} — افتحوا السؤال!</>
+          ) : (
+            <>الدور على: {turnTeam?.name}</>
+          )}
         </div>
-        <TeamPanel index={1} />
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${state.teams.length}, minmax(0, 1fr))` }}
+        >
+          {state.teams.map((_, idx) => (
+            <TeamPanel key={idx} index={idx} />
+          ))}
+        </div>
       </div>
       {/* board — 6 columns across, fits the TV without scrolling */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6 2xl:gap-4">
+      <div className={cn("grid min-h-0 flex-1 gap-2 2xl:gap-4", categoryGridClass)}>
         {state.catKeys.map((key) => {
           const cat = CATEGORY_BY_KEY[key];
           const cells = state.cells.filter((c) => c.catKey === key);
