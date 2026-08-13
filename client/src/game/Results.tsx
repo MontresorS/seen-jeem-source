@@ -8,9 +8,11 @@ import { cn } from "@/lib/utils";
 
 export default function Results() {
   const { state, dispatch, totalRemaining, totalQuestions } = useGame();
-  const [a, b] = state.teams;
-  const tie = a.score === b.score;
-  const winner = tie ? null : a.score > b.score ? a : b;
+  const sortedTeams = [...state.teams].sort((a, b) => b.score - a.score);
+  const topScore = sortedTeams[0]?.score ?? 0;
+  const winners = state.teams.filter((team) => team.score === topScore);
+  const tie = winners.length !== 1;
+  const winner = tie ? null : winners[0];
   const answered = state.history.filter((h) => h.winner !== null).length;
 
   useEffect(() => {
@@ -34,16 +36,16 @@ export default function Results() {
   }, [tie]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6 text-center sm:pt-10">
-      <header className="mb-8 flex justify-center">
+    <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-3 text-center sm:pt-4">
+      <header className="flex justify-center">
         <Logo />
       </header>
 
-      <div className="sj-pop rounded-3xl border-2 border-card-border bg-card p-6 sj-shadow-lg sm:p-10">
+      <div className="sj-pop -mt-4 sm:-mt-6 lg:-mt-8 rounded-3xl border-2 border-card-border bg-card p-6 sj-shadow-lg sm:p-10">
         {tie ? (
           <>
             <Handshake className="sj-float mx-auto mb-3 h-16 w-16 text-primary" />
-            <h1 className="text-xl font-black text-secondary dark:text-foreground sm:text-2xl">
+            <h1 className="text-xl font-black sm:text-2xl" style={{ color: "#3E2723" }}>
               تعادل! 🤝
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -56,7 +58,8 @@ export default function Results() {
             <p className="text-sm font-bold text-muted-foreground">الفريق الفائز</p>
             <h1
               data-testid="text-winner"
-              className="mt-1 break-words text-2xl font-black text-primary sm:text-3xl"
+              className="mt-1 break-words text-2xl font-black sm:text-3xl"
+              style={{ color: "#3E2723" }}
             >
               {winner!.name} 🎉
             </h1>

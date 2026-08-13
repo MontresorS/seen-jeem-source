@@ -12,9 +12,11 @@
     "generate:reversed-candidates:neural": "node scripts/generate-reversed-candidates-elevenlabs.mjs",
     "verify:reversed-candidates:neural": "node scripts/verify-reversed-candidates-neural.mjs",
     "generate:image-questions": "node scripts/generate-image-questions.mjs",
+    "generate:tilepuzzle-images": "node scripts/generate-tilepuzzle-images.mjs",
     "review:image-questions": "python3 -m http.server 4174 --directory artifacts/image-review",
     "update:image-mapping": "node scripts/update-image-question-mapping.mjs",
-    "validate:image-questions": "node scripts/validate-image-question-mappings.mjs"
+    "validate:image-questions": "node scripts/validate-image-question-mappings.mjs",
+    "validate:game-enhancements": "tsx scripts/validate-game-enhancements.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

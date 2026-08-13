@@ -3,23 +3,100 @@ import { ArrowRight, Eye, Pause, Play, RotateCcw, Volume2, X, Music, MapPin, Shu
 import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { playSoundQuestion } from "@/sound-mode";
-import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY } from "./state";
-import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
+import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY, nextTeamIndex } from "./state";
+import { CategoryVisual, CircleTimer, LifelineChip, LifelineIcon } from "./ui";
 import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
 const MAIN = 60;
+const FIVE_SECONDS = 5;
 const SECOND = 10;
 const CALL = 30;
 const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فقط
 const WADDA7_STEPS = [600, 400, 200] as const;
+const WADDA7_BLUR_STEPS = [27.6, 12, 0] as const;
 const QUESTION_TEXT_COLOR = "#3E2723"; // dark brown
+const ALL_TILE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /** hash ثابت من نص — لتوليد عشوائية ثابتة لكل سؤال */
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+function seededShuffle(values: number[], seed: number): number[] {
+  const copy = [...values];
+  let state = seed || 1;
+  for (let i = copy.length - 1; i > 0; i--) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const j = state % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+export function getTilePuzzleDifficulty(points: 200 | 400 | 600): { initialLocked: number; hintAllowance: number } {
+  if (points === 200) return { initialLocked: 3, hintAllowance: 2 };
+  if (points === 400) return { initialLocked: 1, hintAllowance: 1 };
+  return { initialLocked: 0, hintAllowance: 0 };
+}
+
+export function buildTilePuzzleState(
+  seedSource: string,
+  points: 200 | 400 | 600,
+): { tiles: number[]; lockedPositions: number[]; hintAllowance: number } {
+  const { initialLocked, hintAllowance } = getTilePuzzleDifficulty(points);
+  const seed = hashStr(seedSource);
+  const lockedPositions = seededShuffle([...ALL_TILE_INDEXES], seed + 11)
+    .slice(0, initialLocked)
+    .sort((a, b) => a - b);
+
+  const tiles = Array<number>(9).fill(0);
+  lockedPositions.forEach((position) => {
+    tiles[position] = position;
+  });
+
+  const freePositions = ALL_TILE_INDEXES.filter((position) => !lockedPositions.includes(position));
+  if (freePositions.length > 0) {
+    const ordered = seededShuffle(freePositions, seed + 23);
+    const rotatedTiles = ordered.length > 1 ? [...ordered.slice(1), ordered[0]] : ordered;
+    ordered.forEach((position, index) => {
+      tiles[position] = rotatedTiles[index];
+    });
+  }
+
+  return { tiles, lockedPositions, hintAllowance };
+}
+
+export function swapTilePositions(tiles: number[], a: number, b: number): number[] {
+  if (a === b) return tiles;
+  const next = [...tiles];
+  [next[a], next[b]] = [next[b], next[a]];
+  return next;
+}
+
+export function canSwapTilePositions(lockedPositions: number[], a: number, b: number): boolean {
+  if (a === b) return false;
+  return !lockedPositions.includes(a) && !lockedPositions.includes(b);
+}
+
+export function isTilePuzzleSolved(tiles: number[]): boolean {
+  return tiles.every((tile, position) => tile === position);
+}
+
+export function applyTilePuzzleFixHint(
+  tiles: number[],
+  lockedPositions: number[],
+): { tiles: number[]; lockedPositions: number[] } | null {
+  const locked = new Set(lockedPositions);
+  const targetPosition = ALL_TILE_INDEXES.find((position) => !locked.has(position) && tiles[position] !== position);
+  if (targetPosition === undefined) return null;
+  const tileCurrentPosition = tiles.findIndex((tile) => tile === targetPosition);
+  if (tileCurrentPosition < 0 || locked.has(tileCurrentPosition)) return null;
+  const nextTiles = swapTilePositions(tiles, targetPosition, tileCurrentPosition);
+  const nextLocked = Array.from(new Set([...lockedPositions, targetPosition])).sort((a, b) => a - b);
+  return { tiles: nextTiles, lockedPositions: nextLocked };
 }
 
 /** Convert Arabic/Western numerals to number */
@@ -70,43 +147,72 @@ export default function QuestionView() {
   const [clarify, setClarify] = useState(0); // وضح شوية: 0→600، 1→400، 2→200
   const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
   const [clueLevel, setClueLevel] = useState(0); // 0 = no clues, 1 = first clue (600→400), 2 = second (400→200), 3 = third (200→100 or 200 min)
-  const [team1Guess, setTeam1Guess] = useState("");
-  const [team2Guess, setTeam2Guess] = useState("");
+  const [teamGuesses, setTeamGuesses] = useState<Record<number, string>>({});
   const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
+  const [tilePositions, setTilePositions] = useState<number[]>([8, 7, 6, 5, 4, 3, 2, 1, 0]);
+  const [tileLockedPositions, setTileLockedPositions] = useState<number[]>([]);
+  const [tileHintAllowance, setTileHintAllowance] = useState(0);
+  const [tileHintsUsed, setTileHintsUsed] = useState(0);
+  const [selectedTilePosition, setSelectedTilePosition] = useState<number | null>(null);
+  const [tileCompleted, setTileCompleted] = useState(false);
+  const [routeProgress, setRouteProgress] = useState<string[]>([]);
+  const [routeFailed, setRouteFailed] = useState(false);
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
     setClueLevel(0);
-    setTeam1Guess("");
-    setTeam2Guess("");
+    setTeamGuesses({});
     setSubmittedOrder([]);
     setDraggedItem(null);
     setOrderingComparisonResult(null);
-  }, [active?.cellId]);
+    const tilePoints: 200 | 400 | 600 =
+      activeCell?.points === 200 || activeCell?.points === 400 || activeCell?.points === 600
+        ? activeCell.points
+        : 600;
+    const tileState = buildTilePuzzleState(active?.cellId ?? "tile-seed", tilePoints);
+    setTilePositions(tileState.tiles);
+    setTileLockedPositions(tileState.lockedPositions);
+    setTileHintAllowance(tileState.hintAllowance);
+    setTileHintsUsed(0);
+    setSelectedTilePosition(null);
+    setTileCompleted(false);
+    setRouteProgress([]);
+    setRouteFailed(false);
+    const isFiveSecondsRound = activeCell?.catKey === "fiveseconds";
+    setSeconds(isFiveSecondsRound ? FIVE_SECONDS : MAIN);
+    setStage("main");
+    setRunning(true);
+    setRevealed(false);
+    setCall(null);
+  }, [active?.cellId, activeCell?.points]);
 
   // Restore timer from saved state on component mount
   useEffect(() => {
     if (!active?.cellId || !state.timerEndTimestamp) return;
-    
+
     const now = Date.now();
     const msRemaining = state.timerEndTimestamp - now;
-    
+
     // Only restore if timer hasn't completely expired
     if (msRemaining > 1000) {
       const secondsRemaining = Math.ceil(msRemaining / 1000);
       const catKey = activeCell?.catKey;
       const isSilentFilms = catKey === "silentfilms";
       const isDrawGuess = catKey === "drawguess";
-      
+      const isFiveSeconds = catKey === "fiveseconds";
+  const isEscapeMap = catKey === "escapemap";
+
       // For QR modes, timer ranges differ
-      const maxMain = isSilentFilms 
+      const maxMain = isFiveSeconds
+        ? FIVE_SECONDS
+        : isSilentFilms
         ? (activeCell?.points === 600 ? 60 : 90)
         : isDrawGuess
           ? 60
           : MAIN;
-      
+
       if (secondsRemaining <= maxMain) {
         setSeconds(secondsRemaining);
         setStage("main");
@@ -126,10 +232,10 @@ export default function QuestionView() {
   // Restore call timer from saved state
   useEffect(() => {
     if (!state.callEndTimestamp) return;
-    
+
     const now = Date.now();
     const msRemaining = state.callEndTimestamp - now;
-    
+
     if (msRemaining > 1000 && msRemaining <= CALL * 1000) {
       setCall(Math.ceil(msRemaining / 1000));
       setRunning(true);
@@ -139,11 +245,11 @@ export default function QuestionView() {
   // Save timer state whenever it changes
   useEffect(() => {
     if (!active || !running) return;
-    
+
     const now = Date.now();
     const timerEndMs = now + (seconds * 1000);
     const callEndMs = call !== null ? now + (call * 1000) : undefined;
-    
+
     dispatch({
       type: "SET_TIMER",
       timerEndTimestamp: timerEndMs,
@@ -174,6 +280,11 @@ export default function QuestionView() {
       }
       setSeconds((s) => {
         if (s > 1) return s - 1;
+        if (activeCell?.catKey === "fiveseconds") {
+          setStage("over");
+          setRunning(false);
+          return 0;
+        }
         if (stageRef.current === "main") {
           setStage("second");
           return SECOND;
@@ -184,14 +295,12 @@ export default function QuestionView() {
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, [running, revealed, call]);
+  }, [running, revealed, call, activeCell?.catKey]);
 
   if (!active || !activeCell) return null;
 
   const cat = CATEGORY_BY_KEY[activeCell.catKey];
   const asking = state.teams[active.askingTeam];
-  const otherIdx = active.askingTeam === 0 ? 1 : 0;
-  const other = state.teams[otherIdx];
   const usedLifelines = Object.keys(active.lifelines) as LifelineKey[];
   const catKey = activeCell.catKey;
   const isReversed = catKey === "reversed";
@@ -206,10 +315,14 @@ export default function QuestionView() {
   const isCities = catKey === "cities";
   const isWhoami = catKey === "whoami";
   const isBeforeAfter = catKey === "beforeafter";
+  const isLiar = catKey === "liar";
+  const isTilePuzzle = catKey === "tilepuzzle";
   const isClosestNumber = catKey === "closestnumber";
   const isAudienceChoice = catKey === "audiencechoice";
   const isSilentFilms = catKey === "silentfilms";
   const isDrawGuess = catKey === "drawguess";
+  const isFiveSeconds = catKey === "fiveseconds";
+  const isEscapeMap = catKey === "escapemap";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
   // whoami scoring: first clue free, then deductions
@@ -223,13 +336,31 @@ export default function QuestionView() {
   // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
   const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
   const answering = state.teams[answeringTeamIdx];
-  const phoneOwnerName = state.teams[active.lifelines.phone ?? active.askingTeam].name;    const resolveCorrect = (team: 0 | 1) => {
+  const nextTeam = state.teams[nextTeamIndex(answeringTeamIdx, state.teams.length)];
+  const phoneOwnerName = state.teams[active.lifelines.phone ?? active.askingTeam].name;
+  const canUseChoices2 =
+    Array.isArray(activeCell.question.choices) &&
+    activeCell.question.choices.length >= 3 &&
+    Array.isArray(activeCell.question.correctChoices) &&
+    activeCell.question.correctChoices.length === 1;
+  const eliminatedChoice =
+    active.lifelines.choices2 !== undefined && canUseChoices2
+      ? (() => {
+          const correctChoice = activeCell.question.correctChoices?.[0];
+          const removable = (activeCell.question.choices ?? []).filter((choice) => choice !== correctChoice);
+          if (removable.length === 0) return null;
+          return removable[hashStr(`${activeCell.question.id}-choices2`) % removable.length];
+        })()
+      : null;
+  const visibleChoices = (activeCell.question.choices ?? []).filter((choice) => choice !== eliminatedChoice);
+  const tileHintsLeft = Math.max(0, tileHintAllowance - tileHintsUsed);
+  const resolveCorrect = (team: number) => {
         dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
       };
       const resolveNone = () => {
         dispatch({ type: "RESOLVE", outcome: { kind: "none" }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
       };
-      const resolveTrapWrong = (victimTeam: 0 | 1) => {
+      const resolveTrapWrong = (victimTeam: number) => {
         dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
   };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
@@ -239,7 +370,7 @@ export default function QuestionView() {
   const movingLetters = isMoving
     ? movingWords.flatMap((w, wi) => w.split("").map((ch) => ({ ch, wi })))
     : [];
-  
+
   const reversedText = isReversed ? activeCell.question.a.split("").reverse().join("") : "";
 
   const playAudio = () => {
@@ -261,21 +392,30 @@ export default function QuestionView() {
     playSoundQuestion(activeCell.question.id);
   };
 
-  const total = call !== null 
-    ? CALL 
+  useEffect(() => {
+    if (!isTilePuzzle) return;
+    const solved = isTilePuzzleSolved(tilePositions);
+    setTileCompleted(solved);
+    if (solved && !revealed) setRunning(false);
+  }, [isTilePuzzle, tilePositions, revealed, setRunning]);
+
+  const total = call !== null
+    ? CALL
     : isSilentFilms
       ? (activeCell.points === 600 ? 60 : 90)
-      : isDrawGuess 
+      : isDrawGuess
         ? 60
         : stage === "main" ? MAIN : SECOND;
   const shown = call !== null ? call : seconds;
   const label =
-    call !== null
+    isFiveSeconds && call === null
+      ? (stage === "main" ? "خمس ثواني — كل الفرق تجيب!" : "انتهى الوقت!")
+      : call !== null
       ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
         ? `دقيقة كاملة لـ${answering.name}`
         : stage === "second"
-          ? `١٠ ثواني لـ${other.name}`
+          ? `١٠ ثواني لـ${nextTeam?.name ?? "الفريق التالي"}`
           : "انتهى الوقت!";
 
   return (
@@ -306,9 +446,11 @@ export default function QuestionView() {
       <div className="sj-pop overflow-hidden rounded-3xl border-2 border-card-border bg-card sj-shadow-lg">
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
           <span className="flex items-center gap-2 text-sm font-extrabold sm:text-base 2xl:text-3xl">
-            <span aria-hidden className="text-xl 2xl:text-4xl">
-              {cat?.emoji || "🎯"}
-            </span>
+            <CategoryVisual
+              catKey={cat?.key ?? ""}
+              emoji={cat?.emoji || "🎯"}
+              className={cat?.key === "tilepuzzle" ? "h-7 w-7 2xl:h-10 2xl:w-10" : "text-xl 2xl:text-4xl"}
+            />
             {cat?.name || "سؤال"}
           </span>
           <span
@@ -360,7 +502,7 @@ export default function QuestionView() {
                 <Volume2 className="ml-2 h-7 w-7" /> اضغط للاستماع للصوت 🔊
               </Button>
             </div>
-          ) : isCities ? (
+          ) : false ? (
             <div className="flex flex-col items-center gap-3" data-testid="block-cities">
               <div className="flex items-center gap-2 text-primary">
                 <MapPin className="h-6 w-6 sm:h-8 sm:w-8" />
@@ -423,6 +565,83 @@ export default function QuestionView() {
             </p>
           )}
 
+          {isEscapeMap && (
+            <div className="mt-5 flex flex-col items-center gap-4" data-testid="block-escape-map">
+              <div className="w-full max-w-2xl rounded-2xl border-2 border-primary/30 bg-primary/5 p-4 text-center">
+                <p className="text-base font-black" style={{ color: QUESTION_TEXT_COLOR }}>
+                  اختاروا الطريق الصحيح خطوة بخطوة.
+                </p>
+                <p className="mt-1 text-sm font-bold text-muted-foreground">
+                  أي اختيار خاطئ يؤدي إلى طريق مسدود وينهي المحاولة.
+                </p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {routeProgress.map((place, index) => (
+                    <span key={`${place}-${index}`} className="rounded-full bg-emerald-600 px-3 py-1 text-sm font-black text-white">
+                      ✓ {place}
+                    </span>
+                  ))}
+                  {routeProgress.length < (activeCell.question.routeSteps?.length ?? 0) && !routeFailed && (
+                    <span className="rounded-full bg-muted px-3 py-1 text-sm font-black">
+                      الخطوة {routeProgress.length + 1}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {routeFailed ? (
+                <div className="w-full max-w-xl rounded-2xl border-2 border-destructive/50 bg-destructive/10 p-4 text-center">
+                  <p className="text-lg font-black text-destructive">🚫 طريق مسدود! لا نقاط لهذه الجولة.</p>
+                  <Button
+                    className="mt-3 rounded-xl"
+                    variant="outline"
+                    onClick={() => resolveNone()}
+                  >
+                    العودة للوحة
+                  </Button>
+                </div>
+              ) : routeProgress.length === (activeCell.question.routeSteps?.length ?? 0) ? (
+                <div className="w-full max-w-xl rounded-2xl border-2 border-emerald-600/50 bg-emerald-500/10 p-4 text-center">
+                  <p className="text-lg font-black text-emerald-800 dark:text-emerald-100">
+                    🎉 وصلتم للوجهة! اختاروا الفريق الفائز.
+                  </p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {state.teams.map((team, teamIdx) => (
+                      <Button
+                        key={teamIdx}
+                        className="rounded-xl border-2 border-emerald-600 bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                        onClick={() => resolveCorrect(teamIdx)}
+                      >
+                        {team.name} (+{activeCell.points})
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-3">
+                  {(activeCell.question.choices ?? []).map((place) => (
+                    <Button
+                      key={place}
+                      variant="outline"
+                      className="min-h-14 rounded-2xl border-2 text-base font-black"
+                      disabled={routeProgress.includes(place)}
+                      onClick={() => {
+                        const expected = activeCell.question.routeSteps?.[routeProgress.length];
+                        if (place === expected) {
+                          setRouteProgress((progress) => [...progress, place]);
+                        } else {
+                          setRouteFailed(true);
+                          setRunning(false);
+                        }
+                      }}
+                    >
+                      {place}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* MCQ choices rendering */}
           {catKey === 'truefalse' ? (
             <div className="mt-4 flex flex-col items-center gap-4" data-testid="block-truefalse">
@@ -447,10 +666,15 @@ export default function QuestionView() {
               </div>
               <div className="mt-2 text-sm text-muted-foreground">التحديد يعرض فقط؛ اختر النتيجة النهائية بعد كشف الإجابة.</div>
             </div>
-          ) : Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
+          ) : !isEscapeMap && Array.isArray(activeCell.question.choices) && activeCell.question.choices.length > 0 && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-choices">
+              {isLiar && (
+                <p className="text-center text-sm font-extrabold text-primary sm:text-base">
+                  اختر الجملة الكاذبة فقط
+                </p>
+              )}
               <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-2">
-                {activeCell.question.choices.map((choice, idx) => {
+                {visibleChoices.map((choice, idx) => {
                   const selected = selectedChoices.includes(choice);
                   const maxAllowed = active.lifelines.double === active.askingTeam ? 2 : 1;
                   return (
@@ -511,7 +735,7 @@ export default function QuestionView() {
                     onClick={() => setClueLevel((c) => Math.min(c + 1, (activeCell.question.clues?.length ?? 0)))}
                     className="mt-3 w-full rounded-lg bg-primary/20 px-3 py-2 text-sm font-black text-primary hover:bg-primary/30 sm:text-base"
                   >
-                    الكشف عن تلميح (النقاط: {whoamiPointSteps[Math.min(clueLevel + 1, 2)]} بعده)
+                    الكشف عن تلميح (النقاط: {whoamiSteps[Math.min(clueLevel + 1, 3)]} بعده)
                   </button>
                 )}
               </div>
@@ -547,43 +771,46 @@ export default function QuestionView() {
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-closestnumber">
               <div className="w-full max-w-lg rounded-2xl border-2 border-primary/30 bg-muted/20 p-4">
                 <p className="mb-4 text-center text-sm font-bold text-primary sm:text-base">أدخل الرقم الصحيح لكل فريق</p>
-                <div className="flex flex-col gap-4 sm:flex-row sm:gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 1: {asking.name}</label>
-                    <input
-                      type="text"
-                      value={team1Guess}
-                      onChange={(e) => setTeam1Guess(e.target.value)}
-                      placeholder="أدخل الرقم"
-                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
-                      inputMode="numeric"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold text-foreground mb-1">الفريق 2: {other.name}</label>
-                    <input
-                      type="text"
-                      value={team2Guess}
-                      onChange={(e) => setTeam2Guess(e.target.value)}
-                      placeholder="أدخل الرقم"
-                      className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-sm font-black text-center"
-                      inputMode="numeric"
-                    />
-                  </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {state.teams.map((team, idx) => (
+                    <div key={idx} className="flex-1">
+                      <label className="mb-1 block text-xs font-bold text-foreground">{team.name}</label>
+                      <input
+                        type="text"
+                        value={teamGuesses[idx] ?? ""}
+                        onChange={(e) =>
+                          setTeamGuesses((prev) => ({
+                            ...prev,
+                            [idx]: e.target.value,
+                          }))
+                        }
+                        placeholder="أدخل الرقم"
+                        className="w-full rounded-lg border-2 border-card-border bg-card px-3 py-2 text-center text-sm font-black"
+                        inputMode="numeric"
+                      />
+                    </div>
+                  ))}
                 </div>
-                {(team1Guess || team2Guess) && activeCell.question.numericAnswer !== undefined && (
+                {Object.values(teamGuesses).some((value) => value.trim() !== "") && activeCell.question.numericAnswer !== undefined && (
                   <div className="mt-3 rounded-lg bg-primary/10 p-3 text-center">
                     {(() => {
-                      const n1 = parseNumber(team1Guess);
-                      const n2 = parseNumber(team2Guess);
-                      if (n1 === null && n2 === null) return <span className="text-xs text-muted-foreground">ادخل الأرقام</span>;
-                      const diff1 = n1 !== null ? Math.abs(n1 - activeCell.question.numericAnswer) : Infinity;
-                      const diff2 = n2 !== null ? Math.abs(n2 - activeCell.question.numericAnswer) : Infinity;
-                      if (diff1 === diff2 && diff1 !== Infinity) {
+                      const guesses = state.teams
+                        .map((team, idx) => ({
+                          name: team.name,
+                          value: parseNumber(teamGuesses[idx] ?? ""),
+                        }))
+                        .filter((entry) => entry.value !== null) as { name: string; value: number }[];
+                      if (guesses.length === 0) return <span className="text-xs text-muted-foreground">ادخل الأرقام</span>;
+                      const diffs = guesses.map((entry) => ({
+                        ...entry,
+                        diff: Math.abs(entry.value - activeCell.question.numericAnswer!),
+                      }));
+                      const best = Math.min(...diffs.map((entry) => entry.diff));
+                      const winners = diffs.filter((entry) => entry.diff === best);
+                      if (winners.length > 1) {
                         return <span className="text-sm font-black text-primary">تعادل — لا نقاط</span>;
                       }
-                      const winner = diff1 < diff2 ? asking.name : other.name;
-                      return <span className="text-sm font-black text-primary">الأقرب: {winner}</span>;
+                      return <span className="text-sm font-black text-primary">الأقرب: {winners[0].name}</span>;
                     })()}
                   </div>
                 )}
@@ -651,10 +878,10 @@ export default function QuestionView() {
 
                 {/* Current submitted order or shuffled if empty */}
                 {(() => {
-                  const currentOrder = submittedOrder.length > 0 
+                  const currentOrder = submittedOrder.length > 0
                     ? submittedOrder
                     : (activeCell.question.orderItems || []);
-                  
+
                   if (currentOrder.length === 0) {
                     return <div className="text-xs text-center text-muted-foreground">لا توجد عناصر للترتيب</div>;
                   }
@@ -843,19 +1070,113 @@ export default function QuestionView() {
                             })}
             </div>
           )}
+          {isTilePuzzle && hasImage && (
+            <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-tile-puzzle">
+              <div className="grid w-full max-w-[24rem] grid-cols-3 gap-1 rounded-2xl border-4 border-card-border bg-card p-1">
+                {tilePositions.map((tileIndex, positionIndex) => {
+                  const col = tileIndex % 3;
+                  const row = Math.floor(tileIndex / 3);
+                  const isLocked = tileLockedPositions.includes(positionIndex);
+                  const isSelected = selectedTilePosition === positionIndex;
+                  return (
+                    <button
+                      key={`${tileIndex}-${positionIndex}`}
+                      type="button"
+                      onClick={() => {
+                        if (revealed || tileCompleted || isLocked) return;
+                        if (selectedTilePosition === null) {
+                          setSelectedTilePosition(positionIndex);
+                          return;
+                        }
+                        if (selectedTilePosition === positionIndex) {
+                          setSelectedTilePosition(null);
+                          return;
+                        }
+                        if (!canSwapTilePositions(tileLockedPositions, selectedTilePosition, positionIndex)) {
+                          setSelectedTilePosition(positionIndex);
+                          return;
+                        }
+                        setTilePositions((prev) => swapTilePositions(prev, selectedTilePosition, positionIndex));
+                        setSelectedTilePosition(null);
+                      }}
+                      className={cn(
+                        "relative aspect-square overflow-hidden rounded-md border bg-muted transition",
+                        isLocked ? "border-emerald-600 ring-2 ring-emerald-500/40" : "border-card-border",
+                        isSelected && "border-primary-border ring-2 ring-primary",
+                        revealed || tileCompleted || isLocked ? "cursor-default" : "cursor-pointer",
+                      )}
+                    >
+                      <div
+                        aria-label="صورة لغز ركّبها صح"
+                        className="h-full w-full bg-cover"
+                        style={{
+                          backgroundImage: `url(${activeCell.question.image})`,
+                          backgroundSize: "300% 300%",
+                          backgroundPosition: `${col * 50}% ${row * 50}%`,
+                        }}
+                      />
+                      {isLocked && (
+                        <span className="absolute left-1 top-1 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                          ثابت
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {!revealed && !tileCompleted && (
+                <p className="text-center text-xs font-bold text-muted-foreground sm:text-sm">
+                  اختاروا بلاطتين لتبديل أماكنهما. البلاطات الثابتة لا تتحرك.
+                </p>
+              )}
+              {!revealed && tileHintAllowance > 0 && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full border-2 font-bold"
+                    data-testid="button-tile-fix-one"
+                    disabled={tileHintsLeft <= 0 || tileCompleted}
+                    onClick={() => {
+                      const hinted = applyTilePuzzleFixHint(tilePositions, tileLockedPositions);
+                      if (!hinted) return;
+                      setTilePositions(hinted.tiles);
+                      setTileLockedPositions(hinted.lockedPositions);
+                      setTileHintsUsed((prev) => prev + 1);
+                      setSelectedTilePosition(null);
+                    }}
+                  >
+                    تثبيت بلاطة صحيحة ({tileHintsLeft})
+                  </Button>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    المساعدات المتاحة: {tileHintAllowance} — المستخدمة: {tileHintsUsed}
+                  </span>
+                </div>
+              )}
+              {!revealed && tileCompleted && (
+                <div className="w-full max-w-md rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-center">
+                  <p className="text-base font-black text-emerald-900 dark:text-emerald-100">🎉 ممتاز! اللغز اكتمل.</p>
+                  <p className="mt-1 text-xs font-bold text-emerald-800/90 dark:text-emerald-200">
+                    الآن اضغط «أظهر الإجابة» لتأكيد النتيجة ثم احتساب النقاط يدويًا.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           {hasImage && (isWadda7 || isZoom) && (
             <div className="mt-4 flex flex-col items-center gap-3">
               <div className="overflow-hidden rounded-2xl border-4 border-card-border bg-muted sj-shadow">
                 <img
                   src={activeCell.question.image}
                   alt="صورة السؤال"
-                  className={cn(
-                    "max-h-[260px] w-auto max-w-full object-contain transition-all duration-500 sm:max-h-[340px] 2xl:max-h-[500px]",
-                    isWadda7 && (clarify === 0 ? "blur-xl" : clarify === 1 ? "blur-md" : "blur-0"),
-                  )}
+                  className="max-h-[260px] w-auto max-w-full object-contain transition-all duration-500 sm:max-h-[340px] 2xl:max-h-[500px]"
                   style={
-                    isZoom
-                      ? { transform: `scale(${zoomScale})`, transformOrigin: zoomOrigin }
+                    isZoom || isWadda7
+                      ? {
+                          transform: isZoom ? `scale(${zoomScale})` : undefined,
+                          transformOrigin: isZoom ? zoomOrigin : undefined,
+                          filter: isWadda7 ? `blur(${WADDA7_BLUR_STEPS[clarify]}px)` : undefined,
+                        }
                       : undefined
                   }
                 />
@@ -897,8 +1218,33 @@ export default function QuestionView() {
               </div>
             </div>
           )}
+          {isFiveSeconds && !revealed && (
+            <div className="mb-5 rounded-2xl border-2 border-primary-border bg-primary/10 p-4 text-center" data-testid="block-five-seconds">
+              <p className="text-lg font-black" style={{ color: QUESTION_TEXT_COLOR }}>
+                كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ٥ ثواني.
+              </p>
+              <p className="mt-1 text-sm font-bold text-muted-foreground">
+                يختار المضيف أول فريق أكمل الإجابات الصحيحة.
+              </p>
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {state.teams.map((team, teamIdx) => (
+                  <Button
+                    key={teamIdx}
+                    data-testid={`button-five-seconds-team${teamIdx}-correct`}
+                    onClick={() => {
+                      setRunning(false);
+                      resolveCorrect(teamIdx);
+                    }}
+                    className="sj-press rounded-2xl border-2 border-emerald-600 bg-emerald-600 font-black text-white hover:bg-emerald-700"
+                  >
+                    {team.name} أول إجابة صحيحة (+{activeCell.points})
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="mt-6 flex flex-col items-center gap-4 sm:mt-8">
-            <CircleTimer seconds={shown} total={total} label={label} paused={!running || revealed} />
+            <CircleTimer seconds={shown} total={isFiveSeconds && call === null ? FIVE_SECONDS : total} label={label} paused={!running || revealed} />
             {!revealed ? (
               <Button
                 data-testid="button-reveal"
@@ -952,10 +1298,13 @@ export default function QuestionView() {
         size="sm"
         variant="outline"
         disabled={
+          isFiveSeconds ||
           state.teams[active.askingTeam].used[l.key] ||
           active.lifelines[l.key] !== undefined ||
-          (l.key === "phone" && call !== null)
+          (l.key === "phone" && call !== null) ||
+          (l.key === "choices2" && !canUseChoices2)
         }
+        title={l.key === "choices2" && !canUseChoices2 ? "غير متاح: لا توجد اختيارات منظمة وآمنة لهذا السؤال" : undefined}
         onClick={() => {
           if (l.key === "phone") setCall(CALL);
           dispatch({ type: "USE_LIFELINE", key: l.key, team: active.askingTeam });
@@ -971,20 +1320,16 @@ export default function QuestionView() {
           </div>
           {revealed && (
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center" data-testid="block-resolution-buttons">
-              <Button
-                          data-testid="button-team0-correct"
-                          onClick={() => resolveCorrect(0)}
-                className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
-              >
-                          {state.teams[0].name} إجابة صحيحة (+{effectivePoints})
-              </Button>
-              <Button
-                          data-testid="button-team1-correct"
-                          onClick={() => resolveCorrect(1)}
-                          className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
-                        >
-                          {state.teams[1].name} إجابة صحيحة (+{effectivePoints})
-                        </Button>
+              {state.teams.map((team, teamIdx) => (
+                <Button
+                  key={teamIdx}
+                  data-testid={`button-team${teamIdx}-correct`}
+                  onClick={() => resolveCorrect(teamIdx)}
+                  className="sj-press h-14 rounded-2xl border-2 border-emerald-600 bg-emerald-600 text-lg font-black text-white hover:bg-emerald-700 sj-shadow sm:px-8 2xl:h-20 2xl:text-3xl"
+                >
+                  {team.name} إجابة صحيحة (+{effectivePoints})
+                </Button>
+              ))}
                         <Button
                           data-testid="button-skip"
                           onClick={() => resolveNone()}

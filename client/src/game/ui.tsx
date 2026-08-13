@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, ArrowLeftRight, Bomb, Hand, HelpCircle, Clock } from "lucide-react";
+import { Phone, ArrowLeftRight, Bomb, Hand, HelpCircle, Clock, ListChecks } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,22 +15,32 @@ import { cn } from "@/lib/utils";
 /* ---------------- Logo ---------------- */
 export function Logo({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
+    <div className={cn("flex w-full justify-center", className)}>
       <img
-        src="/seen-jeem-logo.jpg"
-        alt="شعار سين وجيم — نسخة منتصر المحسنة"
-        style={{ objectFit: "contain" }}
-        className="h-16 w-16 shrink-0 rounded-xl border-2 border-primary/20 bg-white/80 p-1 shadow-lg sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+        src="/seen-jeem-logo-new.png"
+        alt="الشعار الرئيسي لسين وجيم"
+        className="h-[13.5rem] w-[13.5rem] shrink-0 object-contain drop-shadow-lg sm:h-[18rem] sm:w-[18rem] lg:h-[20.25rem] lg:w-[20.25rem]"
       />
-      <span className="flex flex-col leading-none">
-        <span className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: "#3E2723" }}>
-          سين وجيم
-        </span>
-        <span className="mt-1 text-[11px] font-semibold text-muted-foreground sm:text-sm lg:text-base">
-          Montaser's Cool Edition
-        </span>
-      </span>
-    </span>
+    </div>
+  );
+}
+
+export function CategoryVisual({
+  catKey,
+  emoji,
+  className,
+}: {
+  catKey: string;
+  emoji: string;
+  className?: string;
+}) {
+  if (catKey !== "tilepuzzle") return <span className={className}>{emoji}</span>;
+  return (
+    <img
+      src="/images/tilepuzzle/tilepuzzle-emblem.svg"
+      alt="شعار ركّبها صح"
+      className={cn("h-9 w-9 object-contain", className)}
+    />
   );
 }
 
@@ -41,6 +51,7 @@ export function LifelineIcon({ k, className }: { k: LifelineKey; className?: str
   if (k === "hole") return <ArrowLeftRight className={c} strokeWidth={2.4} />;
   if (k === "trap") return <Bomb className={c} strokeWidth={2.4} />;
   if (k === "rest") return <Hand className={c} strokeWidth={2.4} />;
+  if (k === "choices2") return <ListChecks className={c} strokeWidth={2.4} />;
   return (
     <svg viewBox="0 0 24 24" className={c} fill="none" stroke="currentColor" strokeWidth={2.2}>
       <path d="M8.5 12.5 6.7 6.2a1.6 1.6 0 1 1 3.1-.9l1.5 5.4" strokeLinecap="round" />
@@ -122,7 +133,7 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
         <DialogHeader className="text-right">
           <DialogTitle className="text-lg font-extrabold">كيف نلعب سين وجيم؟</DialogTitle>
           <DialogDescription className="text-right leading-relaxed">
-            فريقان، ٦ فئات، و٣٦ سؤالاً. الفريق اللي يجمع أكثر نقاط يفوز.
+            فريقان أو ٣ فرق. مع فريقين تختارون ٦ أو ٩ أو ١٢ فئة، ومع ٣ فرق تختارون ٩ فئات. الفريق اللي يجمع أكثر نقاط يفوز.
           </DialogDescription>
         </DialogHeader>
 
@@ -191,6 +202,13 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
               <li>
                 <b>🎈 حروف متحركة:</b> حروف الإجابة بتتحرك قدامكوم بعشوائية — ركّبوها واعرفوا الكلمة.
               </li>
+              <li>
+                <b>🧩 ركّبها صح:</b> لغز صور ٣×٣ حقيقي، بدّلوا بين بلاطتين لإرجاع الصورة كاملة، ومع كل مستوى توجد
+                مساعدات تثبيت خاصة.
+              </li>
+              <li>
+                <b>🤥 مين الكدّاب:</b> ثلاث جمل (أ/ب/ج) وفيها جملة واحدة كاذبة فقط.
+              </li>
             </ul>
           </div>
 
@@ -205,7 +223,7 @@ export function HelpDialog({ trigger }: { trigger?: React.ReactNode }) {
           <div>
             <p className="mb-1 font-extrabold">خطوات اللعب</p>
             <ol className="list-inside list-decimal space-y-1">
-              <li>اكتبوا أسماء الفريقين واختاروا ٦ فئات.</li>
+              <li>اكتبوا أسماء الفرق وحددوا عددها ثم اختاروا الفئات المطلوبة.</li>
               <li>الفريق الذي عليه الدور يختار فئة وعدد نقاط.</li>
               <li>بعد انتهاء الوقت اضغطوا «أظهر الإجابة» وحدّدوا من جاوب صح.</li>
               <li>ينتقل الدور للفريق الثاني، ويستمر اللعب حتى ينتهي كل الأسئلة.</li>
@@ -223,11 +241,13 @@ export function CircleTimer({
   total,
   label,
   tone = "primary",
+  paused,
 }: {
   seconds: number;
   total: number;
   label: string;
   tone?: "primary" | "danger" | "call";
+  paused?: boolean;
 }) {
   const r = 54;
   const circ = 2 * Math.PI * r;
@@ -261,7 +281,7 @@ export function CircleTimer({
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={circ * (1 - pct)}
-            style={{ transition: "stroke-dashoffset 1s linear" }}
+            style={{ transition: paused ? "none" : "stroke-dashoffset 1s linear" }}
           />
         </svg>
         <span
