@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { LIFELINES, useGame, type TeamIndex } from "./state";
-import { HelpDialog, LifelineChip, Logo } from "./ui";
+import { CategoryVisual, HelpDialog, LifelineChip, Logo } from "./ui";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_TEXT_COLOR = "#3E2723"; // dark brown
@@ -129,10 +129,10 @@ export default function Board() {
           ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
           : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6";
   return (
-    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 lg:h-[100dvh] lg:overflow-hidden lg:pb-3 2xl:gap-3 2xl:px-6">
+    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-2 px-3 pb-8 pt-3 sm:px-4 2xl:gap-3 2xl:px-6">
       {/* top bar — always visible */}
       <header className="flex shrink-0 flex-col items-center gap-2">
-        <Logo className="justify-center" />
+        <Logo />
         {state.gameName && (
           <p
             className="text-center text-sm font-extrabold text-primary 2xl:text-2xl"
@@ -214,7 +214,7 @@ export default function Board() {
         </div>
       </div>
       {/* board — 6 columns across, fits the TV without scrolling */}
-      <div className={cn("grid min-h-0 flex-1 gap-2 2xl:gap-4", categoryGridClass)}>
+      <div className={cn("grid gap-2 2xl:gap-4", categoryGridClass)}>
         {state.catKeys.map((key) => {
           const cat = CATEGORY_BY_KEY[key];
           const cells = state.cells.filter((c) => c.catKey === key);
@@ -222,12 +222,14 @@ export default function Board() {
             <section
               key={key}
               data-testid={`column-category-${key}`}
-              className="flex min-h-0 flex-col overflow-hidden rounded-2xl border-2 border-card-border bg-card sj-shadow"
+              className="flex flex-col rounded-2xl border-2 border-card-border bg-card sj-shadow"
             >
               <div className="flex shrink-0 items-center gap-2 bg-secondary px-3 py-2 text-secondary-foreground 2xl:py-3">
-                <span aria-hidden className="text-2xl leading-none 2xl:text-4xl">
-                  {cat.emoji}
-                </span>
+                <CategoryVisual
+                  catKey={cat.key}
+                  emoji={cat.emoji}
+                  className={cat.key === "tilepuzzle" ? "h-8 w-8 2xl:h-12 2xl:w-12" : "text-2xl leading-none 2xl:text-4xl"}
+                />
                 <h3
                   className="text-sm font-extrabold leading-tight 2xl:text-2xl"
                   style={{ color: CATEGORY_TEXT_COLOR }}
@@ -235,7 +237,7 @@ export default function Board() {
                   {cat.name}
                 </h3>
               </div>
-              <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-3 gap-2 p-2 2xl:gap-3 2xl:p-3">
+              <div className="grid grid-cols-2 grid-rows-3 gap-2 p-2 2xl:gap-3 2xl:p-3">
                 {cells.map((cell) => (
                   <button
                     key={cell.id}
@@ -244,7 +246,7 @@ export default function Board() {
                     disabled={cell.used}
                     onClick={() => dispatch({ type: "OPEN", cellId: cell.id })}
                     className={cn(
-                      "sj-press sj-tick relative flex h-14 items-center justify-center rounded-xl border-2 text-xl font-black sm:text-2xl lg:h-auto lg:min-h-[3rem] 2xl:rounded-2xl 2xl:text-5xl",
+                      "sj-press sj-tick relative flex h-16 min-h-[4rem] items-center justify-center rounded-xl border-2 text-xl font-black sm:h-20 sm:min-h-[4.5rem] sm:text-2xl lg:h-24 lg:min-h-[5rem] 2xl:rounded-2xl 2xl:text-5xl",
                       cell.used
                         ? "cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground/60"
                         : cell.points === 600

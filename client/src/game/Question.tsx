@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { playSoundQuestion } from "@/sound-mode";
 import { LIFELINES, useGame, type LifelineKey, type Outcome, LIFELINE_BY_KEY, nextTeamIndex } from "./state";
-import { CircleTimer, LifelineChip, LifelineIcon } from "./ui";
+import { CategoryVisual, CircleTimer, LifelineChip, LifelineIcon } from "./ui";
 import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فق
 const WADDA7_STEPS = [600, 400, 200] as const;
 const WADDA7_BLUR_STEPS = [27.6, 12, 0] as const;
 const QUESTION_TEXT_COLOR = "#3E2723"; // dark brown
+const ALL_TILE_INDEXES = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /** hash ثابت من نص — لتوليد عشوائية ثابتة لكل سؤال */
 function hashStr(s: string): number {
@@ -23,23 +24,78 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
-export function buildTilePuzzleState(seedSource: string): { order: number[]; initialRevealed: number[] } {
-  const seed = hashStr(seedSource);
-  const order = Array.from({ length: 9 }, (_, i) => i).sort((a, b) => {
-    const scoreA = hashStr(`${seedSource}-${a}`);
-    const scoreB = hashStr(`${seedSource}-${b}`);
-    return scoreA - scoreB;
-  });
-  const initialRevealCount = seed % 2 === 0 ? 2 : 1;
-  return {
-    order,
-    initialRevealed: order.slice(0, initialRevealCount),
-  };
+function seededShuffle(values: number[], seed: number): number[] {
+  const copy = [...values];
+  let state = seed || 1;
+  for (let i = copy.length - 1; i > 0; i--) {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    const j = state % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
-export function revealNextTile(order: number[], revealed: number[]): number[] {
-  const nextTile = order.find((tile) => !revealed.includes(tile));
-  return nextTile === undefined ? revealed : [...revealed, nextTile];
+export function getTilePuzzleDifficulty(points: 200 | 400 | 600): { initialLocked: number; hintAllowance: number } {
+  if (points === 200) return { initialLocked: 3, hintAllowance: 2 };
+  if (points === 400) return { initialLocked: 1, hintAllowance: 1 };
+  return { initialLocked: 0, hintAllowance: 0 };
+}
+
+export function buildTilePuzzleState(
+  seedSource: string,
+  points: 200 | 400 | 600,
+): { tiles: number[]; lockedPositions: number[]; hintAllowance: number } {
+  const { initialLocked, hintAllowance } = getTilePuzzleDifficulty(points);
+  const seed = hashStr(seedSource);
+  const lockedPositions = seededShuffle([...ALL_TILE_INDEXES], seed + 11)
+    .slice(0, initialLocked)
+    .sort((a, b) => a - b);
+
+  const tiles = Array<number>(9).fill(0);
+  lockedPositions.forEach((position) => {
+    tiles[position] = position;
+  });
+
+  const freePositions = ALL_TILE_INDEXES.filter((position) => !lockedPositions.includes(position));
+  if (freePositions.length > 0) {
+    const ordered = seededShuffle(freePositions, seed + 23);
+    const rotatedTiles = ordered.length > 1 ? [...ordered.slice(1), ordered[0]] : ordered;
+    ordered.forEach((position, index) => {
+      tiles[position] = rotatedTiles[index];
+    });
+  }
+
+  return { tiles, lockedPositions, hintAllowance };
+}
+
+export function swapTilePositions(tiles: number[], a: number, b: number): number[] {
+  if (a === b) return tiles;
+  const next = [...tiles];
+  [next[a], next[b]] = [next[b], next[a]];
+  return next;
+}
+
+export function canSwapTilePositions(lockedPositions: number[], a: number, b: number): boolean {
+  if (a === b) return false;
+  return !lockedPositions.includes(a) && !lockedPositions.includes(b);
+}
+
+export function isTilePuzzleSolved(tiles: number[]): boolean {
+  return tiles.every((tile, position) => tile === position);
+}
+
+export function applyTilePuzzleFixHint(
+  tiles: number[],
+  lockedPositions: number[],
+): { tiles: number[]; lockedPositions: number[] } | null {
+  const locked = new Set(lockedPositions);
+  const targetPosition = ALL_TILE_INDEXES.find((position) => !locked.has(position) && tiles[position] !== position);
+  if (targetPosition === undefined) return null;
+  const tileCurrentPosition = tiles.findIndex((tile) => tile === targetPosition);
+  if (tileCurrentPosition < 0 || locked.has(tileCurrentPosition)) return null;
+  const nextTiles = swapTilePositions(tiles, targetPosition, tileCurrentPosition);
+  const nextLocked = Array.from(new Set([...lockedPositions, targetPosition])).sort((a, b) => a - b);
+  return { tiles: nextTiles, lockedPositions: nextLocked };
 }
 
 /** Convert Arabic/Western numerals to number */
@@ -94,8 +150,12 @@ export default function QuestionView() {
   const [submittedOrder, setSubmittedOrder] = useState<string[]>([]);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [orderingComparisonResult, setOrderingComparisonResult] = useState<"correct" | "incorrect" | null>(null);
-  const [revealedTiles, setRevealedTiles] = useState<number[]>([]);
-  const [tileOrder, setTileOrder] = useState<number[]>([]);
+  const [tilePositions, setTilePositions] = useState<number[]>([...ALL_TILE_INDEXES]);
+  const [tileLockedPositions, setTileLockedPositions] = useState<number[]>([]);
+  const [tileHintAllowance, setTileHintAllowance] = useState(0);
+  const [tileHintsUsed, setTileHintsUsed] = useState(0);
+  const [selectedTilePosition, setSelectedTilePosition] = useState<number | null>(null);
+  const [tileCompleted, setTileCompleted] = useState(false);
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
@@ -104,10 +164,18 @@ export default function QuestionView() {
     setSubmittedOrder([]);
     setDraggedItem(null);
     setOrderingComparisonResult(null);
-    const tileState = buildTilePuzzleState(active?.cellId ?? "tile-seed");
-    setTileOrder(tileState.order);
-    setRevealedTiles(tileState.initialRevealed);
-  }, [active?.cellId]);
+    const tilePoints: 200 | 400 | 600 =
+      activeCell?.points === 200 || activeCell?.points === 400 || activeCell?.points === 600
+        ? activeCell.points
+        : 600;
+    const tileState = buildTilePuzzleState(active?.cellId ?? "tile-seed", tilePoints);
+    setTilePositions(tileState.tiles);
+    setTileLockedPositions(tileState.lockedPositions);
+    setTileHintAllowance(tileState.hintAllowance);
+    setTileHintsUsed(0);
+    setSelectedTilePosition(null);
+    setTileCompleted(false);
+  }, [active?.cellId, activeCell?.points]);
 
   // Restore timer from saved state on component mount
   useEffect(() => {
@@ -263,6 +331,7 @@ export default function QuestionView() {
         })()
       : null;
   const visibleChoices = (activeCell.question.choices ?? []).filter((choice) => choice !== eliminatedChoice);
+  const tileHintsLeft = Math.max(0, tileHintAllowance - tileHintsUsed);
   const resolveCorrect = (team: number) => {
         dispatch({ type: "RESOLVE", outcome: { kind: "correct", team }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
       };
@@ -300,6 +369,13 @@ export default function QuestionView() {
     if (!isSounds) return;
     playSoundQuestion(activeCell.question.id);
   };
+
+  useEffect(() => {
+    if (!isTilePuzzle) return;
+    const solved = isTilePuzzleSolved(tilePositions);
+    setTileCompleted(solved);
+    if (solved && !revealed) setRunning(false);
+  }, [isTilePuzzle, tilePositions, revealed, setRunning]);
 
   const total = call !== null 
     ? CALL 
@@ -346,9 +422,11 @@ export default function QuestionView() {
       <div className="sj-pop overflow-hidden rounded-3xl border-2 border-card-border bg-card sj-shadow-lg">
         <div className="flex items-center justify-between gap-2 bg-secondary px-4 py-3 text-secondary-foreground">
           <span className="flex items-center gap-2 text-sm font-extrabold sm:text-base 2xl:text-3xl">
-            <span aria-hidden className="text-xl 2xl:text-4xl">
-              {cat?.emoji || "🎯"}
-            </span>
+            <CategoryVisual
+              catKey={cat?.key ?? ""}
+              emoji={cat?.emoji || "🎯"}
+              className={cat?.key === "tilepuzzle" ? "h-7 w-7 2xl:h-10 2xl:w-10" : "text-xl 2xl:text-4xl"}
+            />
             {cat?.name || "سؤال"}
           </span>
           <span
@@ -894,14 +972,38 @@ export default function QuestionView() {
           {isTilePuzzle && hasImage && (
             <div className="mt-4 flex flex-col items-center gap-3" data-testid="block-tile-puzzle">
               <div className="grid w-full max-w-[24rem] grid-cols-3 gap-1 rounded-2xl border-4 border-card-border bg-card p-1">
-                {tileOrder.map((tileIndex, positionIndex) => {
+                {tilePositions.map((tileIndex, positionIndex) => {
                   const col = tileIndex % 3;
                   const row = Math.floor(tileIndex / 3);
-                  const isVisible = revealed || revealedTiles.includes(tileIndex);
+                  const isLocked = tileLockedPositions.includes(positionIndex);
+                  const isSelected = selectedTilePosition === positionIndex;
                   return (
-                    <div
+                    <button
                       key={`${tileIndex}-${positionIndex}`}
-                      className="relative aspect-square overflow-hidden rounded-md border border-card-border bg-muted"
+                      type="button"
+                      onClick={() => {
+                        if (revealed || tileCompleted || isLocked) return;
+                        if (selectedTilePosition === null) {
+                          setSelectedTilePosition(positionIndex);
+                          return;
+                        }
+                        if (selectedTilePosition === positionIndex) {
+                          setSelectedTilePosition(null);
+                          return;
+                        }
+                        if (!canSwapTilePositions(tileLockedPositions, selectedTilePosition, positionIndex)) {
+                          setSelectedTilePosition(positionIndex);
+                          return;
+                        }
+                        setTilePositions((prev) => swapTilePositions(prev, selectedTilePosition, positionIndex));
+                        setSelectedTilePosition(null);
+                      }}
+                      className={cn(
+                        "relative aspect-square overflow-hidden rounded-md border bg-muted transition",
+                        isLocked ? "border-emerald-600 ring-2 ring-emerald-500/40" : "border-card-border",
+                        isSelected && "border-primary-border ring-2 ring-primary",
+                        revealed || tileCompleted || isLocked ? "cursor-default" : "cursor-pointer",
+                      )}
                     >
                       <div
                         aria-label="صورة لغز ركّبها صح"
@@ -912,22 +1014,51 @@ export default function QuestionView() {
                           backgroundPosition: `${col * 50}% ${row * 50}%`,
                         }}
                       />
-                      {!isVisible && <div className="absolute inset-0 bg-secondary/80" />}
-                    </div>
+                      {isLocked && (
+                        <span className="absolute left-1 top-1 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                          ثابت
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
               </div>
-              {!revealed && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-full border-2 font-bold"
-                  data-testid="button-tile-reveal-one"
-                  disabled={revealedTiles.length >= 9}
-                  onClick={() => setRevealedTiles((prev) => revealNextTile(tileOrder, prev))}
-                >
-                  كشف بلاطة واحدة
-                </Button>
+              {!revealed && !tileCompleted && (
+                <p className="text-center text-xs font-bold text-muted-foreground sm:text-sm">
+                  اختاروا بلاطتين لتبديل أماكنهما. البلاطات الثابتة لا تتحرك.
+                </p>
+              )}
+              {!revealed && tileHintAllowance > 0 && (
+                <div className="flex flex-col items-center gap-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full border-2 font-bold"
+                    data-testid="button-tile-fix-one"
+                    disabled={tileHintsLeft <= 0 || tileCompleted}
+                    onClick={() => {
+                      const hinted = applyTilePuzzleFixHint(tilePositions, tileLockedPositions);
+                      if (!hinted) return;
+                      setTilePositions(hinted.tiles);
+                      setTileLockedPositions(hinted.lockedPositions);
+                      setTileHintsUsed((prev) => prev + 1);
+                      setSelectedTilePosition(null);
+                    }}
+                  >
+                    تثبيت بلاطة صحيحة ({tileHintsLeft})
+                  </Button>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    المساعدات المتاحة: {tileHintAllowance} — المستخدمة: {tileHintsUsed}
+                  </span>
+                </div>
+              )}
+              {!revealed && tileCompleted && (
+                <div className="w-full max-w-md rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-center">
+                  <p className="text-base font-black text-emerald-900 dark:text-emerald-100">🎉 ممتاز! اللغز اكتمل.</p>
+                  <p className="mt-1 text-xs font-bold text-emerald-800/90 dark:text-emerald-200">
+                    الآن اضغط «أظهر الإجابة» لتأكيد النتيجة ثم احتساب النقاط يدويًا.
+                  </p>
+                </div>
               )}
             </div>
           )}
@@ -995,6 +1126,7 @@ export default function QuestionView() {
                   setRevealed(true);
                   setRunning(false);
                 }}
+                disabled={isTilePuzzle && !tileCompleted}
                 className="sj-press h-14 w-full max-w-md rounded-2xl border-2 border-primary-border text-lg font-black sj-shadow 2xl:h-20 2xl:max-w-xl 2xl:text-3xl"
               >
                 <Eye className="ml-2 h-5 w-5 2xl:h-8 2xl:w-8" /> أظهر الإجابة
