@@ -81,10 +81,12 @@ export default function GamePage() {
               {snapshotToRestore && (
                 <>
                   اللعبة: <span className="font-bold text-foreground">{snapshotToRestore.gameName}</span>
-                  <br />
-                  {snapshotToRestore.teams[0].name}: {snapshotToRestore.teams[0].score} نقطة
-                  <br />
-                  {snapshotToRestore.teams[1].name}: {snapshotToRestore.teams[1].score} نقطة
+                  {snapshotToRestore.teams.map((team, idx) => (
+                    <span key={`${team.name}-${idx}`}>
+                      <br />
+                      {team.name}: {team.score} نقطة
+                    </span>
+                  ))}
                 </>
               )}
             </AlertDialogDescription>

@@ -1,9 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 import { CATEGORIES, type Category, type Question } from "@/data/questions";
 
-export type TeamIndex = 0 | 1;
+export type TeamIndex = number;
 export type Points = 200 | 400 | 600;
-export type LifelineKey = "phone" | "hole" | "double" | "trap" | "rest";
+export type LifelineKey = "phone" | "hole" | "double" | "trap" | "rest" | "choices2";
+
+export const TWO_TEAM_CATEGORY_OPTIONS = [6, 9, 12] as const;
+export const THREE_TEAM_CATEGORY_COUNT = 9;
+
+export function isValidSetup(teamCount: number, categoryCount: number): teamCount is 2 | 3 {
+  if (teamCount === 2) return TWO_TEAM_CATEGORY_OPTIONS.includes(categoryCount as (typeof TWO_TEAM_CATEGORY_OPTIONS)[number]);
+  if (teamCount === 3) return categoryCount === THREE_TEAM_CATEGORY_COUNT;
+  return false;
+}
+
+export function nextTeamIndex(current: TeamIndex, totalTeams: number): TeamIndex {
+  if (totalTeams <= 0) return 0;
+  return (current + 1) % totalTeams;
+}
 
 export interface LifelineMeta {
   key: LifelineKey;
@@ -39,6 +53,15 @@ export const LIFELINES: LifelineMeta[] = [
     when: "after",
     icon: "double",
     tone: "text-sky-700 bg-sky-100 border-sky-300 dark:text-sky-200 dark:bg-sky-900/50 dark:border-sky-700",
+  },
+  {
+    key: "choices2",
+    name: "اختيارين بس",
+    desc: "نشيل لك اختيار واحد غلط من الاختيارات المتاحة (مرة واحدة لكل فريق).",
+    when: "after",
+    icon: "choices2",
+    tone: "text-indigo-700 bg-indigo-100 border-indigo-300 dark:text-indigo-200 dark:bg-indigo-900/50 dark:border-indigo-700",
+    isNew: true,
   },
   {
     key: "trap",
@@ -86,13 +109,14 @@ export interface ActiveQuestion {
   /** If a trap was used, the answering opportunity is transferred here. Keep askingTeam as the original owner. */
   trappedTo?: TeamIndex | null;
   hole: boolean;
+  holeTarget: TeamIndex | null;
   lifelines: Partial<Record<LifelineKey, TeamIndex>>;
 }
 
 export interface GameState {
   phase: "setup" | "board" | "question" | "results";
   gameName: string;
-  teams: [Team, Team];
+  teams: Team[];
   turn: TeamIndex;
   catKeys: string[];
   cells: Cell[];
@@ -112,10 +136,10 @@ export interface GameState {
 const freshTeam = (name: string): Team => ({
   name,
   score: 0,
-  used: { phone: false, hole: false, double: false, trap: false, rest: false },
+  used: { phone: false, hole: false, double: false, trap: false, rest: false, choices2: false },
 });
 
-const initialState: GameState = {
+export const initialState: GameState = {
   phase: "setup",
   gameName: "",
   teams: [freshTeam("الفريق الأول"), freshTeam("الفريق الثاني")],
@@ -231,7 +255,7 @@ export type Outcome =
   | { kind: "trap-wrong"; team?: TeamIndex };
 
 type Action =
-  | { type: "START"; gameName: string; names: [string, string]; catKeys: string[] }
+  | { type: "START"; gameName: string; names: string[]; catKeys: string[]; teamCount: 2 | 3 }
   | { type: "OPEN"; cellId: string }
   | { type: "CLOSE" }
   | { type: "ARM_HOLE"; team: TeamIndex }
@@ -246,9 +270,10 @@ type Action =
   | { type: "SET_TIMER"; timerEndTimestamp?: number; callEndTimestamp?: number }
   | { type: "RESTORE_GAME"; state: GameState };
 
-function reducer(state: GameState, action: Action): GameState {
+export function reducer(state: GameState, action: Action): GameState {
   switch (action.type) {
     case "START": {
+      if (!isValidSetup(action.teamCount, action.catKeys.length)) return state;
       const cats = action.catKeys
         .map((k) => CATEGORIES.find((c) => c.key === k))
         .filter(Boolean) as Category[];
@@ -266,14 +291,16 @@ function reducer(state: GameState, action: Action): GameState {
       } catch {
         // Silently ignore
       }
+      const defaultNames =
+        action.teamCount === 3
+          ? ["الفريق الأول", "الفريق الثاني", "الفريق الثالث"]
+          : ["الفريق الأول", "الفريق الثاني"];
+      const teams = defaultNames.map((fallback, idx) => freshTeam(action.names[idx]?.trim() || fallback));
       return {
         ...initialState,
         phase: "board",
         gameName: action.gameName.trim(),
-        teams: [
-          freshTeam(action.names[0].trim() || "الفريق الأول"),
-          freshTeam(action.names[1].trim() || "الفريق الثاني"),
-        ],
+        teams,
         catKeys: cats.map((c) => c.key),
         cells,
         usedIds,
@@ -288,7 +315,7 @@ function reducer(state: GameState, action: Action): GameState {
       const cell = state.cells.find((c) => c.id === action.cellId);
       if (!cell || cell.used) return state;
       const holeTeam = state.pendingHole;
-      const teams = [...state.teams] as [Team, Team];
+      const teams = [...state.teams];
       if (holeTeam !== null) {
         teams[holeTeam] = { ...teams[holeTeam], used: { ...teams[holeTeam].used, hole: true } };
       }
@@ -301,6 +328,7 @@ function reducer(state: GameState, action: Action): GameState {
           cellId: cell.id,
           askingTeam: state.turn,
           hole: holeTeam === state.turn,
+          holeTarget: holeTeam === state.turn ? nextTeamIndex(state.turn, state.teams.length) : null,
           lifelines: holeTeam !== null ? { hole: holeTeam } : {},
         },
       };
@@ -311,7 +339,7 @@ function reducer(state: GameState, action: Action): GameState {
       if (!state.active) return state;
       const t = state.teams[action.team];
       if (t.used[action.key]) return state;
-      const teams = [...state.teams] as [Team, Team];
+      const teams = [...state.teams];
       teams[action.team] = { ...t, used: { ...t.used, [action.key]: true } };
           const newActive: ActiveQuestion = {
             ...state.active,
@@ -319,7 +347,7 @@ function reducer(state: GameState, action: Action): GameState {
           };
           // Trap transfers the answering opportunity to the opposing team, but keep askingTeam as original owner.
           if (action.key === "trap") {
-            newActive.trappedTo = action.team === 0 ? 1 : 0;
+            newActive.trappedTo = nextTeamIndex(action.team, state.teams.length);
           }
           return {
             ...state,
@@ -335,16 +363,14 @@ function reducer(state: GameState, action: Action): GameState {
       const cell = state.cells.find((c) => c.id === active.cellId);
       if (!cell) return state;
       const pts = action.pointsOverride ?? cell.points;
-      const teams = [state.teams[0], state.teams[1]] as [Team, Team];
-      const other = (t: TeamIndex): TeamIndex => (t === 0 ? 1 : 0);
+      const teams = [...state.teams];
       let winner: TeamIndex | null = null;
 
       if (action.outcome.kind === "correct") {
         winner = action.outcome.team;
         teams[winner] = { ...teams[winner], score: teams[winner].score + pts };
-        if (active.hole && winner === active.askingTeam) {
-          const o = other(winner);
-          teams[o] = { ...teams[o], score: teams[o].score - pts };
+        if (active.hole && winner === active.askingTeam && active.holeTarget !== null) {
+          teams[active.holeTarget] = { ...teams[active.holeTarget], score: teams[active.holeTarget].score - pts };
         }
       } else if (action.outcome.kind === "trap-wrong") {
         // Deduct points from the team that actually had the answering opportunity (trappedTo),
@@ -360,13 +386,13 @@ function reducer(state: GameState, action: Action): GameState {
         teams,
         cells,
         active: null,
-        turn: other(active.askingTeam),
+        turn: nextTeamIndex(active.askingTeam, teams.length),
         phase: allUsed ? "results" : "board",
               history: [...state.history, { question: cell.question, winner, points: action.outcome.kind === "trap-wrong" ? -pts : pts }],
       };
     }
     case "ADJUST": {
-      const teams = [state.teams[0], state.teams[1]] as [Team, Team];
+      const teams = [...state.teams];
       teams[action.team] = {
         ...teams[action.team],
         score: teams[action.team].score + action.delta,
