@@ -5,6 +5,14 @@ export type TeamIndex = number;
 export type Points = 200 | 400 | 600;
 export type LifelineKey = "phone" | "hole" | "double" | "trap" | "rest" | "choices2";
 
+export const CHARADES_POINTS = 400;
+export const CHARADES_SECONDS = 60;
+
+export interface CharadesRound {
+  team: TeamIndex;
+  movie: string;
+}
+
 export const TWO_TEAM_CATEGORY_OPTIONS = [6, 9, 12] as const;
 export const THREE_TEAM_CATEGORY_COUNT = 9;
 
@@ -122,6 +130,7 @@ export interface GameState {
   cells: Cell[];
   active: ActiveQuestion | null;
   pendingHole: TeamIndex | null;
+  charades: CharadesRound | null;
   history: { question: Question; winner: TeamIndex | null; points: number }[];
   /** أسئلة استُخدمت في هذه الجلسة (تبقى بعد «العب مرة ثانية») — الأقدم أولاً */
   usedIds: string[];
@@ -148,6 +157,7 @@ export const initialState: GameState = {
   cells: [],
   active: null,
   pendingHole: null,
+  charades: null,
   history: [],
   usedIds: [],
   recycledOnBoard: false,
@@ -174,8 +184,8 @@ function buildCells(
   usedOrder: Map<string, number>,
   takenNow: Set<string>,
 ): Cell[] {
-  // «وضح شوية»: كل الخانات تبدأ بـ600 وتقل القيمة مع كل ضغطة توضيح
-  if (cat.key === "wadda7") {
+  // «وضح شوية» و«مين أنا؟»: كل الخانات تبدأ بـ600 وتقل القيمة داخل السؤال.
+  if (cat.key === "wadda7" || cat.key === "whoami") {
     const freshAll = shuffle(cat.questions.filter((q) => !usedSet.has(q.id) && !takenNow.has(q.id)));
     const recyclable = shuffle(cat.questions.filter((q) => !takenNow.has(q.id))).sort(
       (a, b) => (usedOrder.get(a.id) ?? -1) - (usedOrder.get(b.id) ?? -1),
@@ -257,6 +267,10 @@ export type Outcome =
 type Action =
   | { type: "START"; gameName: string; names: string[]; catKeys: string[]; teamCount: 2 | 3 }
   | { type: "OPEN"; cellId: string }
+  | { type: "START_CHARADES"; team: TeamIndex }
+  | { type: "SET_CHARADES_MOVIE"; movie: string }
+  | { type: "CANCEL_CHARADES" }
+  | { type: "RESOLVE_CHARADES"; guessed: boolean }
   | { type: "CLOSE" }
   | { type: "ARM_HOLE"; team: TeamIndex }
   | { type: "USE_LIFELINE"; key: LifelineKey; team: TeamIndex }
@@ -311,6 +325,52 @@ export function reducer(state: GameState, action: Action): GameState {
       if (state.teams[action.team].used.hole) return state;
       return { ...state, pendingHole: state.pendingHole === action.team ? null : action.team };
     }
+    case "START_CHARADES": {
+      if (state.phase !== "board" || !state.teams[action.team]) return state;
+      return {
+        ...state,
+        phase: "question",
+        charades: { team: action.team, movie: "" },
+        active: null,
+        pendingHole: null,
+        timerEndTimestamp: undefined,
+        callEndTimestamp: undefined,
+      };
+    }
+    case "SET_CHARADES_MOVIE": {
+      if (!state.charades) return state;
+      return { ...state, charades: { ...state.charades, movie: action.movie } };
+    }
+    case "CANCEL_CHARADES":
+      return {
+        ...state,
+        phase: "board",
+        charades: null,
+        active: null,
+        timerEndTimestamp: undefined,
+        callEndTimestamp: undefined,
+      };
+    case "RESOLVE_CHARADES": {
+      if (!state.charades) return state;
+      const teams = [...state.teams];
+      const actingTeam = state.charades.team;
+      if (action.guessed) {
+        teams[actingTeam] = {
+          ...teams[actingTeam],
+          score: teams[actingTeam].score + CHARADES_POINTS,
+        };
+      }
+      return {
+        ...state,
+        teams,
+        phase: "board",
+        charades: null,
+        active: null,
+        turn: nextTeamIndex(actingTeam, teams.length),
+        timerEndTimestamp: undefined,
+        callEndTimestamp: undefined,
+      };
+    }
     case "OPEN": {
       const cell = state.cells.find((c) => c.id === action.cellId);
       if (!cell || cell.used) return state;
@@ -331,6 +391,9 @@ export function reducer(state: GameState, action: Action): GameState {
           holeTarget: holeTeam === state.turn ? nextTeamIndex(state.turn, state.teams.length) : null,
           lifelines: holeTeam !== null ? { hole: holeTeam } : {},
         },
+        // A newly opened question must never inherit a previous question's timer.
+        timerEndTimestamp: undefined,
+        callEndTimestamp: undefined,
       };
     }
     case "USE_LIFELINE": {
@@ -356,7 +419,7 @@ export function reducer(state: GameState, action: Action): GameState {
           };
         }
     case "CLOSE":
-      return { ...state, phase: "board", active: null };
+      return { ...state, phase: "board", active: null, timerEndTimestamp: undefined, callEndTimestamp: undefined };
     case "RESOLVE": {
       if (!state.active) return state;
       const active = state.active;
@@ -386,6 +449,8 @@ export function reducer(state: GameState, action: Action): GameState {
         teams,
         cells,
         active: null,
+        timerEndTimestamp: undefined,
+        callEndTimestamp: undefined,
         turn: nextTeamIndex(active.askingTeam, teams.length),
         phase: allUsed ? "results" : "board",
               history: [...state.history, { question: cell.question, winner, points: action.outcome.kind === "trap-wrong" ? -pts : pts }],

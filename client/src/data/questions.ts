@@ -2053,7 +2053,7 @@ export const CATEGORIES: Category[] = [
   },
   {
     key: "fiveseconds",
-    name: "خمس ثواني",
+    name: "عشر ثواني",
     emoji: "⏱️",
     questions: [
       { id: "fiveseconds-200-1", points: 200, q: "اذكر ثلاثة ألوان لعلم مصر.", a: "الأحمر، الأبيض، الأسود" },
