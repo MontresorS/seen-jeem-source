@@ -11,12 +11,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { CATEGORY_BY_KEY, CATEGORY_TEXT_COLOR } from "@/game/categories";
+import { CATEGORY_BY_KEY } from "@/data/questions";
 import { useGame } from "@/game/state";
 import { cn } from "@/lib/utils";
 import { HelpDialog } from "@/game/HelpDialog";
 import { CategoryVisual } from "@/game/CategoryVisual";
 import { LIFELINES, LifelineChip } from "@/game/Lifelines";
+
+const CATEGORY_TEXT_COLOR = "#3E2723";
 
 function TeamPanel({ index }: { index: number }) {
   const { state, dispatch } = useGame();
