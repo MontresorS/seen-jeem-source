@@ -161,7 +161,8 @@ export default function QuestionView() {
   // reset per-question selections when active question changes
   useEffect(() => {
     setSelectedChoices([]);
-    setClueLevel(0);
+    // «مين أنا؟» opens with the first clue already visible.
+    setClueLevel(activeCell?.catKey === "whoami" ? 1 : 0);
     setTeamGuesses({});
     setSubmittedOrder([]);
     setDraggedItem(null);
@@ -274,14 +275,13 @@ export default function QuestionView() {
   const isEscapeMap = catKey === "escapemap";
   const hasImage = Boolean(activeCell.question.image);
   const qhash = hashStr(activeCell.question.id);
-  // whoami scoring: first clue free, then deductions
-  const whoamiPointSteps = (originalPoints: number): readonly number[] => {
-    if (originalPoints === 600) return [600, 600, 400, 200] as const;
-    if (originalPoints === 400) return [400, 400, 200, 200] as const;
-    return [200, 200, 200, 200] as const;
-  };
-  const whoamiSteps = whoamiPointSteps(activeCell.points);
-  const effectivePoints = isWadda7 ? WADDA7_STEPS[clarify] : (isWhoami ? whoamiSteps[Math.min(clueLevel, 3)] : activeCell.points);
+  // «مين أنا؟»: first clue starts at 600; later clues reduce the score.
+  const whoamiSteps = [600, 600, 400, 200, 100] as const;
+  const effectivePoints = isWadda7
+    ? WADDA7_STEPS[clarify]
+    : isWhoami
+      ? whoamiSteps[Math.min(clueLevel, whoamiSteps.length - 1)]
+      : activeCell.points;
   // who is currently answering: if trap used, trappedTo is the answering team, otherwise the original asking team
   const answeringTeamIdx = (active.trappedTo !== undefined && active.trappedTo !== null) ? active.trappedTo : active.askingTeam;
   const answering = state.teams[answeringTeamIdx];
@@ -681,7 +681,7 @@ export default function QuestionView() {
                     onClick={() => setClueLevel((c) => Math.min(c + 1, (activeCell.question.clues?.length ?? 0)))}
                     className="mt-3 w-full rounded-lg bg-primary/20 px-3 py-2 text-sm font-black text-primary hover:bg-primary/30 sm:text-base"
                   >
-                    الكشف عن تلميح (النقاط: {whoamiSteps[Math.min(clueLevel + 1, 3)]} بعده)
+                    الكشف عن تلميح (النقاط: {whoamiSteps[Math.min(clueLevel + 1, whoamiSteps.length - 1)]} بعده)
                   </button>
                 )}
               </div>

@@ -184,8 +184,8 @@ function buildCells(
   usedOrder: Map<string, number>,
   takenNow: Set<string>,
 ): Cell[] {
-  // «وضح شوية»: كل الخانات تبدأ بـ600 وتقل القيمة مع كل ضغطة توضيح
-  if (cat.key === "wadda7") {
+  // «وضح شوية» و«مين أنا؟»: كل الخانات تبدأ بـ600 وتقل القيمة داخل السؤال.
+  if (cat.key === "wadda7" || cat.key === "whoami") {
     const freshAll = shuffle(cat.questions.filter((q) => !usedSet.has(q.id) && !takenNow.has(q.id)));
     const recyclable = shuffle(cat.questions.filter((q) => !takenNow.has(q.id))).sort(
       (a, b) => (usedOrder.get(a.id) ?? -1) - (usedOrder.get(b.id) ?? -1),
