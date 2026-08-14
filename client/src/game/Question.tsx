@@ -9,8 +9,7 @@ import QRDisplay from "./QRDisplay";
 import { cn } from "@/lib/utils";
 
 const MAIN = 60;
-const FIVE_SECONDS = 5;
-const SECOND = 10;
+const TEN_SECONDS = 10;
 const CALL = 30;
 const MAX_AUDIO_PLAYS = 2; // تشغيلة أولى + إعادة واحدة فقط
 const WADDA7_STEPS = [600, 400, 200] as const;
@@ -138,7 +137,7 @@ export default function QuestionView() {
   const { state, dispatch, activeCell } = useGame();
   const active = state.active;
   const [revealed, setRevealed] = useState(false);
-  const [stage, setStage] = useState<"main" | "second" | "over">("main");
+  const [stage, setStage] = useState<"main" | "opponent" | "over">("main");
   const [seconds, setSeconds] = useState(MAIN);
   const [running, setRunning] = useState(true);
   const [call, setCall] = useState<number | null>(null);
@@ -180,54 +179,13 @@ export default function QuestionView() {
     setTileCompleted(false);
     setRouteProgress([]);
     setRouteFailed(false);
-    const isFiveSecondsRound = activeCell?.catKey === "fiveseconds";
-    setSeconds(isFiveSecondsRound ? FIVE_SECONDS : MAIN);
+    const isTenSecondsRound = activeCell?.catKey === "fiveseconds";
+    setSeconds(isTenSecondsRound ? TEN_SECONDS : MAIN);
     setStage("main");
     setRunning(true);
     setRevealed(false);
     setCall(null);
   }, [active?.cellId, activeCell?.points]);
-
-  // Restore timer from saved state on component mount
-  useEffect(() => {
-    if (!active?.cellId || !state.timerEndTimestamp) return;
-
-    const now = Date.now();
-    const msRemaining = state.timerEndTimestamp - now;
-
-    // Only restore if timer hasn't completely expired
-    if (msRemaining > 1000) {
-      const secondsRemaining = Math.ceil(msRemaining / 1000);
-      const catKey = activeCell?.catKey;
-      const isSilentFilms = catKey === "silentfilms";
-      const isDrawGuess = catKey === "drawguess";
-      const isFiveSeconds = catKey === "fiveseconds";
-  const isEscapeMap = catKey === "escapemap";
-
-      // For QR modes, timer ranges differ
-      const maxMain = isFiveSeconds
-        ? FIVE_SECONDS
-        : isSilentFilms
-        ? (activeCell?.points === 600 ? 60 : 90)
-        : isDrawGuess
-          ? 60
-          : MAIN;
-
-      if (secondsRemaining <= maxMain) {
-        setSeconds(secondsRemaining);
-        setStage("main");
-        setRunning(true);
-      } else {
-        // Timer was in second stage
-        const secondStageSeconds = secondsRemaining - maxMain;
-        if (secondStageSeconds <= SECOND) {
-          setSeconds(secondStageSeconds);
-          setStage("second");
-          setRunning(true);
-        }
-      }
-    }
-  }, []);
 
   // Restore call timer from saved state
   useEffect(() => {
@@ -280,15 +238,6 @@ export default function QuestionView() {
       }
       setSeconds((s) => {
         if (s > 1) return s - 1;
-        if (activeCell?.catKey === "fiveseconds") {
-          setStage("over");
-          setRunning(false);
-          return 0;
-        }
-        if (stageRef.current === "main") {
-          setStage("second");
-          return SECOND;
-        }
         setStage("over");
         setRunning(false);
         return 0;
@@ -399,23 +348,18 @@ export default function QuestionView() {
     if (solved && !revealed) setRunning(false);
   }, [isTilePuzzle, tilePositions, revealed, setRunning]);
 
-  const total = call !== null
-    ? CALL
-    : isSilentFilms
-      ? (activeCell.points === 600 ? 60 : 90)
-      : isDrawGuess
-        ? 60
-        : stage === "main" ? MAIN : SECOND;
+  const activeTimerTotal = isFiveSeconds || stage === "opponent" ? TEN_SECONDS : MAIN;
+  const total = call !== null ? CALL : activeTimerTotal;
   const shown = call !== null ? call : seconds;
   const label =
     isFiveSeconds && call === null
-      ? (stage === "main" ? "خمس ثواني — كل الفرق تجيب!" : "انتهى الوقت!")
+      ? (stage === "main" ? "عشر ثواني — كل الفرق تجيب!" : "انتهى الوقت!")
       : call !== null
       ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
         ? `دقيقة كاملة لـ${answering.name}`
-        : stage === "second"
-          ? `١٠ ثواني لـ${nextTeam?.name ?? "الفريق التالي"}`
+        : stage === "opponent"
+          ? `١٠ ثوانٍ لـ${nextTeam?.name ?? "الفريق المنافس"}`
           : "انتهى الوقت!";
 
   return (
@@ -1221,7 +1165,7 @@ export default function QuestionView() {
           {isFiveSeconds && !revealed && (
             <div className="mb-5 rounded-2xl border-2 border-primary-border bg-primary/10 p-4 text-center" data-testid="block-five-seconds">
               <p className="text-lg font-black" style={{ color: QUESTION_TEXT_COLOR }}>
-                كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ٥ ثواني.
+                كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ١٠ ثوانٍ.
               </p>
               <p className="mt-1 text-sm font-bold text-muted-foreground">
                 يختار المضيف أول فريق أكمل الإجابات الصحيحة.
@@ -1244,7 +1188,58 @@ export default function QuestionView() {
             </div>
           )}
           <div className="mt-6 flex flex-col items-center gap-4 sm:mt-8">
-            <CircleTimer seconds={shown} total={isFiveSeconds && call === null ? FIVE_SECONDS : total} label={label} paused={!running || revealed} />
+            <CircleTimer seconds={shown} total={total} label={label} paused={!running || revealed} />
+            {!revealed && (
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-full border-2 font-bold"
+                  data-testid="button-toggle-timer"
+                  onClick={() => {
+                    setRunning((value) => {
+                      const next = !value;
+                      if (!next) {
+                        dispatch({ type: "SET_TIMER", timerEndTimestamp: undefined, callEndTimestamp: undefined });
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  {running ? <Pause className="ml-1 h-4 w-4" /> : <Play className="ml-1 h-4 w-4" />}
+                  {running ? "إيقاف الوقت" : "تشغيل الوقت"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full border-2 font-bold"
+                  data-testid="button-reset-timer"
+                  onClick={() => {
+                    const resetTo = isFiveSeconds || stage === "opponent" ? TEN_SECONDS : MAIN;
+                    setCall(null);
+                    setSeconds(resetTo);
+                    setRunning(false);
+                    dispatch({ type: "SET_TIMER", timerEndTimestamp: undefined, callEndTimestamp: undefined });
+                  }}
+                >
+                  <RotateCcw className="ml-1 h-4 w-4" />
+                  إعادة ضبط الوقت
+                </Button>
+                {!isFiveSeconds && stage !== "opponent" && (
+                  <Button
+                    variant="secondary"
+                    className="rounded-full border-2 font-bold"
+                    data-testid="button-opponent-timer"
+                    onClick={() => {
+                      setCall(null);
+                      setStage("opponent");
+                      setSeconds(TEN_SECONDS);
+                      setRunning(true);
+                    }}
+                  >
+                    وقت المنافس — ١٠ ثوانٍ
+                  </Button>
+                )}
+              </div>
+            )}
             {!revealed ? (
               <Button
                 data-testid="button-reveal"
