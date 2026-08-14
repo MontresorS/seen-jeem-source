@@ -313,7 +313,9 @@ export default function QuestionView() {
         dispatch({ type: "RESOLVE", outcome: { kind: "trap-wrong", team: victimTeam }, pointsOverride: (isWadda7 || isWhoami) ? effectivePoints : undefined });
   };
   const zoomScale = activeCell.points === 200 ? 4 : activeCell.points === 400 ? 6 : 8;
-  const zoomOrigin = `${25 + (qhash % 50)}% ${25 + ((qhash >> 3) % 50)}%`;
+  // A random focal point can land on empty background. Default to the image centre
+  // until a question supplies an intentional focal point.
+  const zoomOrigin = "50% 50%";
   const logoMask = LOGO_MASKS[qhash % LOGO_MASKS.length];
   const movingWords = isMoving ? activeCell.question.a.split(/\s+/) : [];
   const movingLetters = isMoving
