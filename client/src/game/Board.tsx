@@ -12,11 +12,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { CATEGORY_BY_KEY } from "@/data/questions";
-import { useGame } from "@/game/state";
+import { LIFELINES, useGame, type TeamIndex } from "./state";
 import { cn } from "@/lib/utils";
-import { HelpDialog } from "@/game/HelpDialog";
-import { CategoryVisual } from "@/game/CategoryVisual";
-import { LIFELINES, LifelineChip } from "@/game/Lifelines";
+import { CategoryVisual, HelpDialog, LifelineChip } from "./ui";
 
 const CATEGORY_TEXT_COLOR = "#3E2723";
 
@@ -205,11 +203,9 @@ export default function Board() {
               className="flex flex-col overflow-hidden rounded-2xl border-2 border-[#B45309] bg-card sj-shadow"
             >
               <div className="flex shrink-0 items-center gap-1.5 bg-secondary px-2 py-1.5 text-secondary-foreground sm:gap-2 sm:px-3 sm:py-2 2xl:py-3">
-                <CategoryVisual
-                  catKey={cat.key}
-                  emoji={cat.emoji}
-                  className={cat.key === "tilepuzzle" ? "h-6 w-6 sm:h-8 sm:w-8 2xl:h-12 2xl:w-12" : "text-lg leading-none sm:text-2xl 2xl:text-4xl"}
-                />
+                <span className="text-lg leading-none sm:text-2xl 2xl:text-4xl" aria-hidden="true">
+                  {cat.emoji}
+                </span>
                 <h3
                   className="text-xs font-extrabold leading-tight sm:text-sm 2xl:text-2xl"
                   style={{ color: CATEGORY_TEXT_COLOR }}
