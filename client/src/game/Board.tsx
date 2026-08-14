@@ -122,14 +122,14 @@ export default function Board() {
   const turnTeam = state.teams[state.turn];
   const categoryGridClass =
     state.teams.length === 3
-      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3"
       : state.catKeys.length >= 12
-        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+        ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
         : state.catKeys.length === 9
-          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6";
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3"
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6";
   return (
-    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 px-3 pb-8 pt-3 sm:px-4 2xl:gap-2 2xl:px-6">
+    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 overflow-x-hidden px-2 pb-5 pt-2 sm:px-4 sm:pb-8 sm:pt-3 2xl:gap-2 2xl:px-6">
       {/* top bar — always visible */}
       <header className="flex shrink-0 items-start justify-end">
         <img
@@ -218,7 +218,7 @@ export default function Board() {
         </div>
       </div>
       {/* board — 6 columns across, fits the TV without scrolling */}
-      <div className={cn("grid gap-2 2xl:gap-4", categoryGridClass)}>
+      <div className={cn("grid gap-1.5 sm:gap-2 2xl:gap-4", categoryGridClass)}>
         {state.catKeys.map((key) => {
           const cat = CATEGORY_BY_KEY[key];
           const cells = state.cells.filter((c) => c.catKey === key);
@@ -228,14 +228,14 @@ export default function Board() {
               data-testid={`column-category-${key}`}
               className="flex flex-col rounded-2xl border-2 border-[#B45309] bg-card sj-shadow"
             >
-              <div className="flex shrink-0 items-center gap-2 bg-secondary px-3 py-2 text-secondary-foreground 2xl:py-3">
+              <div className="flex shrink-0 items-center gap-1.5 bg-secondary px-2 py-1.5 text-secondary-foreground sm:gap-2 sm:px-3 sm:py-2 2xl:py-3">
                 <CategoryVisual
                   catKey={cat.key}
                   emoji={cat.emoji}
-                  className={cat.key === "tilepuzzle" ? "h-8 w-8 2xl:h-12 2xl:w-12" : "text-2xl leading-none 2xl:text-4xl"}
+                  className={cat.key === "tilepuzzle" ? "h-6 w-6 sm:h-8 sm:w-8 2xl:h-12 2xl:w-12" : "text-lg leading-none sm:text-2xl 2xl:text-4xl"}
                 />
                 <h3
-                  className="text-sm font-extrabold leading-tight 2xl:text-2xl"
+                  className="text-xs font-extrabold leading-tight sm:text-sm 2xl:text-2xl"
                   style={{ color: CATEGORY_TEXT_COLOR }}
                 >
                   {cat.name}
@@ -250,7 +250,7 @@ export default function Board() {
                     disabled={cell.used}
                     onClick={() => dispatch({ type: "OPEN", cellId: cell.id })}
                     className={cn(
-                      "sj-press sj-tick relative flex h-16 min-h-[4rem] items-center justify-center rounded-xl border-2 text-xl font-black sm:h-20 sm:min-h-[4.5rem] sm:text-2xl lg:h-24 lg:min-h-[5rem] 2xl:rounded-2xl 2xl:text-5xl",
+                      "sj-press sj-tick relative flex h-11 min-h-[2.75rem] items-center justify-center rounded-lg border-2 text-base font-black sm:h-16 sm:min-h-[4rem] sm:rounded-xl sm:text-xl lg:h-20 lg:min-h-[4.5rem] lg:text-2xl 2xl:h-24 2xl:min-h-[5rem] 2xl:rounded-2xl 2xl:text-5xl",
                       cell.used
                         ? "cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground/60"
                         : cell.points === 600
