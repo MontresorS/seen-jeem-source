@@ -1,4 +1,4 @@
-import { Minus, Plus, Flag, Recycle } from "lucide-react";
+import { Flag, Minus, Plus, Recycle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -13,87 +13,61 @@ import {
 } from "@/components/ui/alert-dialog";
 import { CATEGORY_BY_KEY } from "@/data/questions";
 import { LIFELINES, useGame, type TeamIndex } from "./state";
-import { CategoryVisual, HelpDialog, LifelineChip, Logo } from "./ui";
 import { cn } from "@/lib/utils";
+import { CategoryVisual, HelpDialog, LifelineChip } from "./ui";
 
-const CATEGORY_TEXT_COLOR = "#3E2723"; // dark brown
-const TEAM_THEMES = [
-  {
-    active: "border-primary bg-primary/12",
-    dot: "bg-primary",
-  },
-  {
-    active: "border-emerald-600 bg-emerald-100/80 dark:bg-emerald-900/30",
-    dot: "bg-emerald-600",
-  },
-  {
-    active: "border-violet-600 bg-violet-100/80 dark:bg-violet-900/30",
-    dot: "bg-violet-600",
-  },
-] as const;
+const CATEGORY_TEXT_COLOR = "#3E2723";
 
-function TeamPanel({ index }: { index: TeamIndex }) {
+function TeamPanel({ index }: { index: number }) {
   const { state, dispatch } = useGame();
   const team = state.teams[index];
-  if (!team) return null;
   const isTurn = state.turn === index;
-  const theme = TEAM_THEMES[index % TEAM_THEMES.length];
+  const isHoleArmed = state.pendingHole === index;
+
   return (
     <div
-      data-testid={`panel-team-${index + 1}`}
       className={cn(
-        "flex-1 rounded-2xl border-2 px-3 py-2 transition-colors 2xl:px-5 2xl:py-3",
-        isTurn ? `${theme.active} sj-shadow` : "border-card-border bg-card opacity-90",
+        "relative rounded-2xl border-2 p-2 text-center transition-all 2xl:p-3",
+        isTurn
+          ? "border-primary bg-primary/5 sj-shadow"
+          : "border-card-border bg-card",
+        isHoleArmed && "border-amber-500 bg-amber-100 dark:bg-amber-900/40",
       )}
+      data-testid={`team-panel-${index}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => dispatch({ type: "SET_TURN", team: index })}
-          data-testid={`button-set-turn-${index + 1}`}
-          className="min-w-0 text-right"
-          title="اجعل الدور على هذا الفريق"
+      {isTurn && (
+        <span className="absolute -top-3 right-3 rounded-full bg-primary px-2 py-0.5 text-[10px] font-extrabold text-primary-foreground 2xl:text-sm">
+          الدور عليه الآن
+        </span>
+      )}
+      <h2 className="text-lg font-extrabold text-foreground 2xl:text-3xl">
+        {team.name}
+      </h2>
+      <div className="mt-1 flex items-center justify-center gap-4" dir="ltr">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-full border-2 2xl:h-11 2xl:w-11"
+          onClick={() => dispatch({ type: "ADJUST_SCORE", team: index, delta: -100 })}
+          aria-label={`خصم 100 من ${team.name}`}
         >
-          <p className="truncate text-base font-extrabold sm:text-lg 2xl:text-3xl" style={{ color: CATEGORY_TEXT_COLOR }}>
-            {team.name}
-          </p>
-          <p className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground 2xl:text-lg">
-            {isTurn && (
-              <span className="inline-flex items-center gap-1 text-foreground">
-                <span className={cn("h-2 w-2 rounded-full", theme.dot)} />
-                الدور عليه الآن
-              </span>
-            )}
-          </p>
-        </button>
-        <div className="flex shrink-0 items-center gap-1 2xl:gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full border-2 2xl:h-11 2xl:w-11"
-            aria-label="خصم ١٠٠"
-            data-testid={`button-minus-${index + 1}`}
-            onClick={() => dispatch({ type: "ADJUST", team: index, delta: -100 })}
-          >
-            <Minus className="h-3.5 w-3.5 2xl:h-6 2xl:w-6" />
-          </Button>
-          <span
-            data-testid={`text-score-${index + 1}`}
-                    className="sj-tick min-w-[3.5rem] rounded-lg bg-secondary px-2 py-0.5 text-center text-xl font-black text-black sm:text-2xl 2xl:min-w-[7rem] 2xl:rounded-2xl 2xl:text-5xl"
-          >
-            {team.score}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full border-2 2xl:h-11 2xl:w-11"
-            aria-label="إضافة ١٠٠"
-            data-testid={`button-plus-${index + 1}`}
-            onClick={() => dispatch({ type: "ADJUST", team: index, delta: 100 })}
-          >
-            <Plus className="h-3.5 w-3.5 2xl:h-6 2xl:w-6" />
-          </Button>
-        </div>
+          <Minus className="h-4 w-4 2xl:h-6 2xl:w-6" />
+        </Button>
+        <span
+          className="min-w-8 text-2xl font-black tabular-nums text-foreground 2xl:text-4xl"
+          data-testid={`score-${index}`}
+        >
+          {team.score}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 rounded-full border-2 2xl:h-11 2xl:w-11"
+          onClick={() => dispatch({ type: "ADJUST_SCORE", team: index, delta: 100 })}
+          aria-label={`إضافة 100 إلى ${team.name}`}
+        >
+          <Plus className="h-4 w-4 2xl:h-6 2xl:w-6" />
+        </Button>
       </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {LIFELINES.map((l) => (
@@ -122,20 +96,20 @@ export default function Board() {
   const turnTeam = state.teams[state.turn];
   const categoryGridClass =
     state.teams.length === 3
-      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3"
       : state.catKeys.length >= 12
-        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+        ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6"
         : state.catKeys.length === 9
-          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-6";
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-3"
+          : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6";
   return (
-    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 px-3 pb-8 pt-3 sm:px-4 2xl:gap-2 2xl:px-6">
+    <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-1 overflow-x-hidden px-2 pb-5 pt-2 sm:px-4 sm:pb-8 sm:pt-3 2xl:gap-2 2xl:px-6">
       {/* top bar — always visible */}
-      <header className="flex shrink-0 items-start justify-end">
+      <header className="relative flex min-h-[4.5rem] shrink-0 items-start justify-end pl-16 sm:min-h-[5.5rem] sm:pl-24 2xl:min-h-[7rem] 2xl:pl-32">
         <img
           src="/seen-jeem-logo-new.png"
           alt="الشعار الرئيسي لسين وجيم"
-          className="h-10 w-10 object-contain sm:h-12 sm:w-12 2xl:h-16 2xl:w-16"
+          className="absolute right-0 top-0 h-16 w-16 object-contain sm:h-20 sm:w-20 2xl:h-28 2xl:w-28"
         />
         {state.gameName && (
           <p
@@ -218,7 +192,7 @@ export default function Board() {
         </div>
       </div>
       {/* board — 6 columns across, fits the TV without scrolling */}
-      <div className={cn("grid gap-2 2xl:gap-4", categoryGridClass)}>
+      <div className={cn("grid gap-1.5 sm:gap-2 2xl:gap-4", categoryGridClass)}>
         {state.catKeys.map((key) => {
           const cat = CATEGORY_BY_KEY[key];
           const cells = state.cells.filter((c) => c.catKey === key);
@@ -226,16 +200,14 @@ export default function Board() {
             <section
               key={key}
               data-testid={`column-category-${key}`}
-              className="flex flex-col rounded-2xl border-2 border-[#B45309] bg-card sj-shadow"
+              className="flex flex-col overflow-hidden rounded-2xl border-2 border-[#B45309] bg-card sj-shadow"
             >
-              <div className="flex shrink-0 items-center gap-2 bg-secondary px-3 py-2 text-secondary-foreground 2xl:py-3">
-                <CategoryVisual
-                  catKey={cat.key}
-                  emoji={cat.emoji}
-                  className={cat.key === "tilepuzzle" ? "h-8 w-8 2xl:h-12 2xl:w-12" : "text-2xl leading-none 2xl:text-4xl"}
-                />
+              <div className="flex shrink-0 items-center gap-1.5 bg-secondary px-2 py-1.5 text-secondary-foreground sm:gap-2 sm:px-3 sm:py-2 2xl:py-3">
+                <span className="text-lg leading-none sm:text-2xl 2xl:text-4xl" aria-hidden="true">
+                  {cat.emoji}
+                </span>
                 <h3
-                  className="text-sm font-extrabold leading-tight 2xl:text-2xl"
+                  className="text-xs font-extrabold leading-tight sm:text-sm 2xl:text-2xl"
                   style={{ color: CATEGORY_TEXT_COLOR }}
                 >
                   {cat.name}
@@ -250,7 +222,7 @@ export default function Board() {
                     disabled={cell.used}
                     onClick={() => dispatch({ type: "OPEN", cellId: cell.id })}
                     className={cn(
-                      "sj-press sj-tick relative flex h-16 min-h-[4rem] items-center justify-center rounded-xl border-2 text-xl font-black sm:h-20 sm:min-h-[4.5rem] sm:text-2xl lg:h-24 lg:min-h-[5rem] 2xl:rounded-2xl 2xl:text-5xl",
+                      "sj-press sj-tick relative flex h-11 min-h-[2.75rem] items-center justify-center rounded-lg border-2 text-base font-black sm:h-16 sm:min-h-[4rem] sm:rounded-xl sm:text-xl lg:h-20 lg:min-h-[4.5rem] lg:text-2xl 2xl:h-24 2xl:min-h-[5rem] 2xl:rounded-2xl 2xl:text-5xl",
                       cell.used
                         ? "cursor-not-allowed border-dashed border-border bg-muted text-muted-foreground/60"
                         : cell.points === 600
