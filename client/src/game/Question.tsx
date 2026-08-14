@@ -180,7 +180,8 @@ export default function QuestionView() {
     setTileCompleted(false);
     setRouteProgress([]);
     setRouteFailed(false);
-    const isTenSecondsRound = activeCell?.catKey === "fiveseconds";
+    const isTenSecondsRound =
+      activeCell?.catKey === "fiveseconds" || activeCell?.catKey === "rapidmaths";
     setSeconds(isTenSecondsRound ? TEN_SECONDS : MAIN);
     setStage("main");
     setRunning(true);
@@ -350,12 +351,14 @@ export default function QuestionView() {
     if (solved && !revealed) setRunning(false);
   }, [isTilePuzzle, tilePositions, revealed, setRunning]);
 
-  const activeTimerTotal = isFiveSeconds || stage === "opponent" ? TEN_SECONDS : MAIN;
+  const isRapidMaths = catKey === "rapidmaths";
+  const isRapidFire = isFiveSeconds || isRapidMaths;
+  const activeTimerTotal = isRapidFire || stage === "opponent" ? TEN_SECONDS : MAIN;
   const total = call !== null ? CALL : activeTimerTotal;
   const shown = call !== null ? call : seconds;
   const label =
-    isFiveSeconds && call === null
-      ? (stage === "main" ? "عشر ثواني — كل الفرق تجيب!" : "انتهى الوقت!")
+    isRapidFire && call === null
+      ? (stage === "main" ? `${isRapidMaths ? "رياضيات سريعة" : "عشر ثواني"} — كل الفرق تجيب!` : "انتهى الوقت!")
       : call !== null
       ? `مكالمة صديق — ${phoneOwnerName}`
       : stage === "main"
@@ -1164,10 +1167,12 @@ export default function QuestionView() {
               </div>
             </div>
           )}
-          {isFiveSeconds && !revealed && (
-            <div className="mb-5 rounded-2xl border-2 border-primary-border bg-primary/10 p-4 text-center" data-testid="block-five-seconds">
+          {isRapidFire && !revealed && (
+            <div className="mb-5 rounded-2xl border-2 border-primary-border bg-primary/10 p-4 text-center" data-testid={isRapidMaths ? "block-rapid-maths" : "block-five-seconds"}>
               <p className="text-lg font-black" style={{ color: QUESTION_TEXT_COLOR }}>
-                كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ١٠ ثوانٍ.
+                {isRapidMaths
+                  ? "كل الفرق تجاوب في نفس الوقت: احسبوا الإجابة الصحيحة خلال ١٠ ثوانٍ."
+                  : "كل الفرق تجاوب في نفس الوقت: اذكروا ثلاثة إجابات صحيحة خلال ١٠ ثوانٍ."}
               </p>
               <p className="mt-1 text-sm font-bold text-muted-foreground">
                 يختار المضيف أول فريق أكمل الإجابات الصحيحة.
@@ -1176,7 +1181,7 @@ export default function QuestionView() {
                 {state.teams.map((team, teamIdx) => (
                   <Button
                     key={teamIdx}
-                    data-testid={`button-five-seconds-team${teamIdx}-correct`}
+                    data-testid={`${isRapidMaths ? "button-rapid-maths" : "button-five-seconds"}-team${teamIdx}-correct`}
                     onClick={() => {
                       setRunning(false);
                       resolveCorrect(teamIdx);
@@ -1215,7 +1220,7 @@ export default function QuestionView() {
                   className="rounded-full border-2 font-bold"
                   data-testid="button-reset-timer"
                   onClick={() => {
-                    const resetTo = isFiveSeconds || stage === "opponent" ? TEN_SECONDS : MAIN;
+                    const resetTo = isRapidFire || stage === "opponent" ? TEN_SECONDS : MAIN;
                     setCall(null);
                     setSeconds(resetTo);
                     setRunning(false);
@@ -1225,7 +1230,7 @@ export default function QuestionView() {
                   <RotateCcw className="ml-1 h-4 w-4" />
                   إعادة ضبط الوقت
                 </Button>
-                {!isFiveSeconds && stage !== "opponent" && (
+                {!isRapidFire && stage !== "opponent" && (
                   <Button
                     variant="secondary"
                     className="rounded-full border-2 font-bold"
@@ -1295,7 +1300,7 @@ export default function QuestionView() {
         size="sm"
         variant="outline"
         disabled={
-          isFiveSeconds ||
+          isRapidFire ||
           state.teams[active.askingTeam].used[l.key] ||
           active.lifelines[l.key] !== undefined ||
           (l.key === "phone" && call !== null) ||
