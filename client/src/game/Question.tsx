@@ -1119,7 +1119,7 @@ export default function QuestionView() {
                   style={
                     isZoom || isWadda7
                       ? {
-                          transform: isZoom ? `scale(${zoomScale})` : undefined,
+                          transform: isZoom ? (revealed ? "scale(1)" : `scale(${zoomScale})`) : undefined,
                           transformOrigin: isZoom ? zoomOrigin : undefined,
                           filter: isWadda7 ? `blur(${WADDA7_BLUR_STEPS[clarify]}px)` : undefined,
                         }
