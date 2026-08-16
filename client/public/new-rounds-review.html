@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>مراجعة الصور الجديدة</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #111827; color: #f9fafb; }
+    main { max-width: 1120px; margin: auto; padding: 24px; }
+    h1 { margin: 0 0 8px; } p { color: #cbd5e1; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+    button, select { border: 0; border-radius: 10px; padding: 10px 14px; font: inherit; cursor: pointer; }
+    button { background: #7c3aed; color: white; font-weight: 700; } button.secondary { background: #334155; }
+    select { background: #fff; color: #111827; }
+    .card { background: #1f2937; border-radius: 18px; padding: 18px; text-align: center; }
+    #mainImage { width: min(100%, 600px); aspect-ratio: 1; object-fit: contain; background: #0f172a; border-radius: 12px; }
+    #meta { min-height: 52px; margin: 14px 0 4px; font-size: 1.1rem; } .answer { color: #facc15; font-weight: 800; }
+    #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 24px; }
+    .thumb { background: #1f2937; border: 2px solid transparent; border-radius: 10px; padding: 5px; color: #e2e8f0; }
+    .thumb.active { border-color: #a78bfa; } .thumb img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; display: block; }
+    .thumb small { display:block; padding:5px 2px 1px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>مراجعة ٤٠ صورة جديدة</h1>
+  <p>هذه صفحة مراجعة فقط وغير مرتبطة بواجهة اللعب. اختر نوع اللعبة أو استخدم «عشوائي»، ثم أظهر الإجابة للتحقق من تطابق الصورة.</p>
+  <div class="controls">
+    <select id="mode" aria-label="نوع اللعبة"><option value="all">الكل (٤٠)</option><option value="zoom">زوم (٢٠)</option><option value="wadda7">وضّح شوية (٢٠)</option></select>
+    <button id="shuffle">عشوائي</button><button id="previous" class="secondary">السابق</button><button id="next" class="secondary">التالي</button><button id="reveal" class="secondary">إظهار الإجابة</button>
+  </div>
+  <section class="card">
+    <img id="mainImage" alt="صورة للمراجعة">
+    <div id="meta"></div>
+  </section>
+  <div id="grid" aria-label="كل الصور"></div>
+</main>
+<script>
+const rounds = [
+  ['zoom','zoom-51','تفاحة',16],['zoom','zoom-52','موز',17],['zoom','zoom-53','قلم رصاص',18],['zoom','zoom-54','مسمار',19],['zoom','zoom-55','ورقة شجر',20],['zoom','zoom-56','وردة حمراء',21],['zoom','zoom-57','كرة قدم',22],['zoom','zoom-58','ريشة طائر',23],['zoom','zoom-59','شبكة',24],['zoom','zoom-60','بصل',25],['zoom','zoom-61','كيوي',26],['zoom','zoom-62','نسيج قماش',27],['zoom','zoom-63','كرة تنس',28],['zoom','zoom-64','خشب',29],['zoom','zoom-65','صدفة بحرية',30],['zoom','zoom-66','قشر برتقال',31],['zoom','zoom-67','فراولة',32],['zoom','zoom-68','بيضة',33],['zoom','zoom-69','حلقة معدنية',34],['zoom','zoom-70','قرنبيط',35],
+  ['wadda7','wadda7-51','دراجة هوائية',16],['wadda7','wadda7-52','قطة',17],['wadda7','wadda7-53','كعكة عيد ميلاد',18],['wadda7','wadda7-54','ثلاجة',19],['wadda7','wadda7-55','فراشة',20],['wadda7','wadda7-56','بومة',21],['wadda7','wadda7-57','أسد',22],['wadda7','wadda7-58','دراجة نارية',23],['wadda7','wadda7-59','كنغر',24],['wadda7','wadda7-60','حصان أبيض',25],['wadda7','wadda7-61','نخلة',26],['wadda7','wadda7-62','طاووس',27],['wadda7','wadda7-63','أخطبوط',28],['wadda7','wadda7-64','ثعلب',29],['wadda7','wadda7-65','فيل',30],['wadda7','wadda7-66','خيمة تخييم',31],['wadda7','wadda7-67','إبريق شاي',32],['wadda7','wadda7-68','حقيبة سفر',33],['wadda7','wadda7-69','كمان',34],['wadda7','wadda7-70','ببغاء',35]
+].map(([mode,id,answer,n]) => ({mode,id,answer,src:`/images/${mode}/${mode}-${n}.jpg`}));
+const mode = document.querySelector('#mode'), image = document.querySelector('#mainImage'), meta = document.querySelector('#meta'), grid = document.querySelector('#grid');
+let visible = [], index = 0, answerVisible = false;
+function filtered() { return rounds.filter(r => mode.value === 'all' || r.mode === mode.value); }
+function renderGrid() { grid.innerHTML = ''; visible.forEach((r,i) => { const b=document.createElement('button'); b.className='thumb'+(i===index?' active':''); b.innerHTML=`<img src="${r.src}" alt="${r.id}"><small>${r.id}</small>`; b.onclick=()=>{index=i;answerVisible=false;render();}; grid.append(b); }); }
+function render() { visible=filtered(); if (!visible.length) return; index=((index%visible.length)+visible.length)%visible.length; const r=visible[index]; image.src=r.src; meta.innerHTML=`<strong>${r.mode === 'zoom' ? 'زوم' : 'وضّح شوية'}</strong> · ${r.id}`+(answerVisible?`<br><span class="answer">الإجابة: ${r.answer}</span>`:''); renderGrid(); }
+mode.onchange=()=>{index=0;answerVisible=false;render();};
+document.querySelector('#shuffle').onclick=()=>{visible=filtered();index=Math.floor(Math.random()*visible.length);answerVisible=false;render();};
+document.querySelector('#previous').onclick=()=>{index--;answerVisible=false;render();};
+document.querySelector('#next').onclick=()=>{index++;answerVisible=false;render();};
+document.querySelector('#reveal').onclick=()=>{answerVisible=!answerVisible;render();};
+render();
+</script>
+</body>
+</html>
